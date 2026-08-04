@@ -38,11 +38,22 @@ const CORRIMIENTO = process.pid % 9000;
 const puerto = p => p + CORRIMIENTO;
 const url = p => `http://127.0.0.1:${puerto(p)}`;
 
+// Todo lo que se levanta queda anotado acá: si la corrida se interrumpe, los
+// servidores hijos quedarían vivos ocupando puertos.
+const levantados = new Set();
+function matarTodo() {
+  for (const p of levantados) { try { p.kill(); } catch { /* ya murió */ } }
+  levantados.clear();
+}
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { matarTodo(); process.exit(1); });
+
 function arrancar(port, env = {}, dir = RAIZ) {
   const proc = spawn(process.execPath, ['server.js'], {
     cwd: dir,
     env: { ...process.env, NODE_PATH: PROY + '/node_modules', PORT: String(puerto(port)), MESA_PIN: PIN, ...env }
   });
+  levantados.add(proc);
+  proc.on('exit', () => levantados.delete(proc));
   let salida = '';
   proc.stdout.on('data', d => { salida += d; });
   proc.stderr.on('data', d => { salida += d; });
@@ -72,9 +83,15 @@ function esperar(sock, evento, ms = 3000) {
 async function conectar(port, ringId, pin) {
   const sock = io(url(port), { transports: ['websocket'] });
   await esperar(sock, 'connect');
+  // Los dos listeners se registran ANTES de emitir. El servidor manda `snapshot` y
+  // `mesa_ok` en el mismo tick: si se esperaba el snapshot y recién después se
+  // escuchaba mesa_ok, cuando los dos paquetes llegaban juntos el segundo ya había
+  // pasado y el test moría por timeout. Pasaba de casualidad, según el timing.
+  const pSnap = esperar(sock, 'snapshot');
+  const pMesa = pin === undefined ? Promise.resolve(false) : esperar(sock, 'mesa_ok');
   sock.emit('join', pin === undefined ? ringId : { ringId, pin });
-  const snap = await esperar(sock, 'snapshot');
-  const autorizado = pin === undefined ? false : await esperar(sock, 'mesa_ok');
+  const snap = await pSnap;
+  const autorizado = await pMesa;
   return { sock, snap, autorizado };
 }
 
@@ -114,9 +131,12 @@ async function accionarAviso(sock, evento, arg) {
   fs.writeFileSync(SEED, FIXTURE);
 
   const limpiar = async () => {
+    matarTodo();
+    await dormir(200);   // que Windows suelte los handles antes de borrar
     for (const d of [RAIZ, path.join(__dirname, 'sandbox-import'),
       path.join(__dirname, 'sandbox-g0'), path.join(__dirname, 'sandbox-ver'),
-      path.join(__dirname, 'sandbox-nueva'), path.join(__dirname, 'sandbox-programa')]) {
+      path.join(__dirname, 'sandbox-nueva'), path.join(__dirname, 'sandbox-programa'),
+      path.join(__dirname, 'sandbox-deploy'), path.join(__dirname, 'sandbox-sin-csv')]) {
       for (let intento = 0; intento < 6; intento++) {
         try { fs.rmSync(d, { recursive: true, force: true }); break; }
         catch { await dormir(250); }   // Windows todavía no soltó el handle
@@ -669,6 +689,40 @@ async function accionarAviso(sock, evento, arg) {
     chequear('la competencia nueva sobrevive al reinicio',
       trasR.rings[0].pistas.length === 2, JSON.stringify(trasR.rings[0].pistas.map(p => p.nombre)));
     await matar(srvN2.proc);
+
+    /* ── 6h. deploy: DATA_DIR aparte y arranque sin CSV ──────────────── */
+    console.log('\n6h. Deploy: DATA_DIR separado y arranque sin CSV');
+    const DIR7 = path.join(__dirname, 'sandbox-deploy');
+    prepararSandbox(DIR7);
+    // El ejemplo va en la carpeta del proyecto; el estado, en otra. Es la forma en
+    // que corre en Fly: volumen montado en /data, imagen con el seed.example.csv.
+    fs.writeFileSync(path.join(DIR7, 'data', 'seed.example.csv'), FIXTURE);
+    const VOL = path.join(DIR7, 'volumen');
+    fs.mkdirSync(VOL, { recursive: true });
+    const srvD = await arrancar(3115, { DATA_DIR: VOL }, DIR7);
+    chequear('arranca con DATA_DIR apuntando a otra carpeta', true);
+    chequear('el estado se escribe en DATA_DIR, no en ./data',
+      fs.existsSync(path.join(VOL, 'state.json')) && !fs.existsSync(path.join(DIR7, 'data', 'state.json')),
+      `volumen: ${fs.existsSync(path.join(VOL, 'state.json'))}, ./data: ${fs.existsSync(path.join(DIR7, 'data', 'state.json'))}`);
+    const snapD = (await get(3115, '/api/resumen')).cuerpo;
+    chequear('sembró desde el seed.example.csv de la imagen',
+      snapD.rings.length === 2, JSON.stringify(snapD.rings?.map(r => r.id)));
+    chequear('avisa que usó el ejemplo', srvD.salida().includes('seed.example.csv'), srvD.salida().slice(0, 200));
+    await matar(srvD.proc);
+
+    // Sin ningún CSV: tiene que levantar igual, vacío, en vez de morir.
+    const DIR8 = path.join(__dirname, 'sandbox-sin-csv');
+    prepararSandbox(DIR8);
+    const srvV = await arrancar(3116, {}, DIR8);
+    chequear('sin ningún CSV levanta igual', true);
+    const rVacio = await get(3116, '/api/resumen');
+    chequear('contesta 200 y el health check pasa', rVacio.status === 200, `status ${rVacio.status}`);
+    chequear('no hay competencia cargada', rVacio.cuerpo.rings.length === 0, JSON.stringify(rVacio.cuerpo));
+    chequear('lo dice por consola', srvV.salida().includes('sin competencia cargada'),
+      srvV.salida().slice(0, 220));
+    const rPortada = await get(3116, '/');
+    chequear('la portada igual se sirve', rPortada.status === 200, `status ${rPortada.status}`);
+    await matar(srvV.proc);
 
     /* ── 7. latido ───────────────────────────────────────────────────── */
     console.log('\n7. Latido (frescura)');

@@ -8,12 +8,18 @@ const { Server } = require('socket.io');
 
 const PORT = process.env.PORT || 3000;
 const MESA_PIN = process.env.MESA_PIN || '1234';
-const DATA_DIR = path.join(__dirname, 'data');
+// Dónde vive lo que cambia. Configurable porque en un deploy hay que apuntarlo a
+// un volumen: el disco de la máquina es efímero y se borra en cada deploy.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const SEED_FILE = path.join(DATA_DIR, 'seed.csv');
+
+// El ejemplo se lee SIEMPRE de la carpeta del proyecto, nunca de DATA_DIR: si el
+// volumen se monta encima de ./data, tapa el archivo de la imagen y el servidor
+// quedaría sin ningún CSV del que sembrar.
 // `data/seed.csv` tiene nombres de gente real, así que no se versiona. Un clon
 // nuevo arranca con el ejemplo inventado y funciona sin configurar nada.
-const SEED_EJEMPLO = path.join(DATA_DIR, 'seed.example.csv');
+const SEED_EJEMPLO = path.join(__dirname, 'data', 'seed.example.csv');
 
 // Cada cuánto le confirmamos a los celulares que lo que están viendo sigue
 // vigente. Sin esto el encabezado dice "hace 3 min" en una pista lenta aunque
@@ -195,10 +201,25 @@ function sembrar(texto) {
   return { state: s, saltadas };
 }
 
+// Estado vacío: sin competencia cargada. Es preferible arrancar así que no
+// arrancar — la competencia se puede subir después desde la mesa.
+function estadoVacio() {
+  return {
+    evento: {
+      nombre: process.env.EVENTO || 'Sin competencia cargada',
+      fecha: process.env.FECHA || new Date().toISOString().slice(0, 10)
+    },
+    rings: [], pistas: [], inscripciones: [], marcas: {}
+  };
+}
+
 function seedFromCsv() {
   const archivo = fs.existsSync(SEED_FILE) ? SEED_FILE : SEED_EJEMPLO;
   if (!fs.existsSync(archivo)) {
-    throw new Error(`No encontré data/seed.csv ni data/seed.example.csv en ${DATA_DIR}`);
+    console.warn('\n  No encontré ningún CSV para sembrar.');
+    console.warn(`  Busqué en ${SEED_FILE} y en ${SEED_EJEMPLO}.`);
+    console.warn('  Arranco sin competencia cargada.\n');
+    return estadoVacio();
   }
   if (archivo === SEED_EJEMPLO) {
     console.log('No hay data/seed.csv: sembrando con data/seed.example.csv (datos inventados).');
