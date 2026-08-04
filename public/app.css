@@ -1,0 +1,404 @@
+/* ── tokens ───────────────────────────────────────────────────────────── */
+:root {
+  --turf:   #0E3B2E;   /* verde pasto profundo: cabeceras, estructura */
+  --turf-2: #17513E;
+  --chalk:  #F4F6F1;   /* cal de la línea de pista: fondo */
+  --paper:  #FFFFFF;
+  --slate:  #1B211C;
+  --mist:   #77857A;
+  --line:   #D7DED4;
+  --tape:   #F2B417;   /* cinta de balizamiento: sólo para "vos" */
+  --bar:    #DB3B2B;   /* barra de salto: sólo para ausente/error */
+
+  --r: 6px;
+  --pad: clamp(16px, 4vw, 28px);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--chalk);
+  color: var(--slate);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wrap { max-width: 560px; margin: 0 auto; }
+
+/* Numerales de dorsal: Archivo estrechado, como el número del pechera. */
+.dorsal {
+  font-family: "Archivo", "IBM Plex Sans", sans-serif;
+  font-weight: 800;
+  font-stretch: 68%;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 0.82;
+}
+
+.mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+:where(a, button, [tabindex]):focus-visible {
+  outline: 3px solid var(--tape);
+  outline-offset: 2px;
+}
+
+/* ── cabecera ─────────────────────────────────────────────────────────── */
+.tope {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--turf);
+  color: var(--chalk);
+  padding: 14px var(--pad) 12px;
+}
+.tope .wrap { display: flex; align-items: baseline; gap: 10px; }
+.tope-ring { font-size: 17px; font-weight: 600; }
+.tope-pista { color: #A9C0B2; font-size: 13px; }
+.tope-estado {
+  margin-left: auto; display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: #A9C0B2; white-space: nowrap;
+}
+.pulso {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #48D18C; flex: none;
+}
+.pulso.frio { background: var(--tape); }
+.pulso.muerto { background: var(--bar); }
+
+/* ── selector de pistas del ring ──────────────────────────────────────── */
+/* Scrollea en horizontal: con 12 pistas no entran en una pantalla de celular. */
+.pistas-nav {
+  background: var(--turf-2);
+  border-bottom: 1px solid rgba(244,246,241,.14);
+  padding: 10px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.pistas-nav .wrap {
+  display: flex; gap: 7px; padding: 0 var(--pad);
+  width: max-content; min-width: 100%;
+}
+.pistas-nav .chip {
+  background: rgba(244,246,241,.12); color: var(--chalk);
+  padding: 8px 12px; font-size: 13px; flex: none;
+}
+.pistas-nav .chip.activa { background: var(--chalk); color: var(--turf); font-weight: 600; }
+.pistas-nav .chip.cerrada { opacity: .5; }
+
+/* ── bloque "en pista" ────────────────────────────────────────────────── */
+.pista {
+  background: var(--turf-2);
+  color: var(--chalk);
+  padding: 18px var(--pad) 24px;
+}
+.pista .eyebrow { color: #8FB3A0; }
+.pista-fila { display: flex; align-items: flex-start; gap: 16px; margin-top: 8px; }
+.pista-dorsal { font-size: clamp(64px, 22vw, 104px); flex: none; }
+.pista-quien { padding-top: 6px; min-width: 0; }
+/* El nombre del perro es lo primario: por ahí se llama en la pista. El guía va
+   de secundario, junto con altura y grado. De ahí los nombres por rol y no por
+   contenido: estas clases también visten textos sueltos como "Nadie en pista". */
+.pista-nombre { font-size: 24px; font-weight: 600; line-height: 1.15; }
+.pista-sub { color: #A9C0B2; font-size: 14px; margin-top: 2px; }
+.pista-vacia { font-size: 19px; font-weight: 500; margin-top: 6px; }
+.pista-nota { color: #8FB3A0; font-size: 13px; margin-top: 4px; }
+
+/* ── firma: el contador de perros por delante ─────────────────────────── */
+.turno {
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  padding: 18px var(--pad) 20px;
+}
+.turno .eyebrow { color: var(--mist); }
+
+.cuenta { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
+.cuenta-n { font-size: 56px; }
+.cuenta-txt { font-size: 15px; font-weight: 500; line-height: 1.25; }
+.cuenta-sub { color: var(--mist); font-size: 13px; }
+
+/* Marcas de conteo: una raya por perro, agrupadas de cinco. */
+.tally {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 34px; margin: 14px 0 4px;
+}
+.tally-grupo { display: flex; align-items: flex-end; gap: 3px; margin-right: 9px; }
+.tally i {
+  display: block; width: 4px; height: 24px; border-radius: 1px;
+  background: var(--turf);
+  transition: height .22s ease, opacity .22s ease;
+}
+.tally i.alta { height: 34px; }
+.tally-mas { align-self: center; color: var(--mist); font-size: 12px; margin-left: 4px; }
+
+.turno.es-vos { border-left: 5px solid var(--tape); }
+.turno.ya { background: #EEF2EC; }
+
+.dorsal-set {
+  display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap;
+}
+.dorsal-set input {
+  width: 92px; padding: 10px 12px; font-size: 17px;
+  font-family: "IBM Plex Mono", monospace;
+  border: 1.5px solid var(--line); border-radius: var(--r);
+  background: var(--chalk); color: var(--slate);
+}
+.btn {
+  appearance: none; border: 0; border-radius: var(--r); cursor: pointer;
+  font: inherit; font-weight: 600; padding: 10px 16px;
+  background: var(--turf); color: var(--chalk);
+}
+.btn.fantasma { background: transparent; color: var(--turf); box-shadow: inset 0 0 0 1.5px var(--line); }
+.btn.chico { padding: 11px 14px; font-size: 13px; }
+
+/* ── cola ─────────────────────────────────────────────────────────────── */
+.cola { padding: 20px var(--pad) 64px; }
+.cola > .wrap > .eyebrow { color: var(--mist); }
+
+.cola-lista { list-style: none; margin: 10px 0 0; padding: 0; }
+.cola-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 12px 11px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--turf);
+  border-radius: 0 var(--r) var(--r) 0;
+  margin-bottom: 5px;
+}
+.cola-item .dorsal { font-size: 27px; min-width: 46px; }
+.cola-quien { min-width: 0; flex: 1; }
+.cola-nombre { font-weight: 500; font-size: 16px; }
+.cola-sub { color: var(--mist); font-size: 13px; }
+.cola-eta { color: var(--mist); font-size: 13px; white-space: nowrap; }
+
+.cola-item.vos { border-left-color: var(--tape); background: #FFFBEF; }
+.cola-item.vos .cola-nombre::after {
+  content: "vos"; margin-left: 8px; padding: 1px 6px;
+  background: var(--tape); color: var(--slate);
+  border-radius: 3px; font-size: 10px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; vertical-align: 2px;
+}
+.cola-item.ausente { border-left-color: var(--bar); opacity: .55; }
+.cola-item.ausente .cola-nombre { text-decoration: line-through; }
+
+/* Ya corrió: queda en la lista, pero se va al fondo. */
+.cola-item.corrido { opacity: .45; border-left-color: var(--mist); }
+
+/* En pista: el mismo verde que el bloque de arriba, para que la fila se lea
+   como "es este". Va después de .vos para ganarle el fondo; el borde izquierdo
+   sigue siendo de la cinta cuando además sos vos. */
+.cola-item.corriendo {
+  background: var(--turf-2);
+  border-top-color: var(--turf-2);
+  border-right-color: var(--turf-2);
+  border-bottom-color: var(--turf-2);
+  border-left-color: var(--chalk);
+  color: var(--chalk);
+}
+.cola-item.corriendo.vos { border-left-color: var(--tape); }
+.cola-item.corriendo .cola-nombre { font-weight: 600; }
+.cola-item.corriendo .cola-sub,
+.cola-item.corriendo .cola-eta { color: #A9C0B2; }
+
+.vacio { color: var(--mist); font-size: 15px; padding: 14px 0; }
+
+/* ── etiquetas de altura y grado ──────────────────────────────────────── */
+/* Neutras a propósito: --tape es de "vos" y --bar de ausente. El texto hace el
+   trabajo, sin competir con las dos señales que sí tienen color propio. */
+.etiq {
+  display: inline-block;
+  margin-left: 5px; padding: 0 5px;
+  border: 1px solid var(--line); border-radius: 3px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px; font-weight: 500; letter-spacing: .04em;
+  line-height: 16px; color: var(--mist);
+  vertical-align: 1px; white-space: nowrap;
+}
+/* Sobre los fondos verdes: el bloque de arriba, la fila del que corre, y toda
+   la vista de mesa. */
+.pista .etiq,
+.cola-item.corriendo .etiq,
+body.mesa .etiq { border-color: rgba(244,246,241,.4); color: #A9C0B2; }
+
+/* ── portada ──────────────────────────────────────────────────────────── */
+.portada { padding: 28px var(--pad) 60px; }
+.portada h1 {
+  font-family: "Archivo", sans-serif; font-weight: 800; font-stretch: 78%;
+  font-size: clamp(30px, 9vw, 44px); line-height: 1; margin: 6px 0 26px;
+}
+/* Un bloque por ring, con todas sus pistas adentro. */
+.ring-bloque { margin-bottom: 30px; }
+.ring-bloque-nombre {
+  font-family: "Archivo", sans-serif; font-weight: 800; font-stretch: 78%;
+  font-size: 20px; margin: 0 0 10px;
+}
+
+.ring-card {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--paper); border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 13px 16px; margin-bottom: 7px;
+}
+.ring-card.activa { border-left-color: var(--turf); padding: 16px 18px; }
+.ring-card.cerrada { opacity: .6; }
+.ring-card-tope { display: flex; align-items: baseline; gap: 10px; }
+.ring-card-nombre { font-size: 18px; font-weight: 600; }
+.ring-card-pista { color: var(--mist); font-size: 13px; }
+.ring-card-fila { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.ring-card-fila .dorsal { font-size: 34px; }
+.ring-card-nombre { font-size: 17px; font-weight: 600; }
+.ring-card-sub { color: var(--mist); font-size: 13px; }
+.ring-card-faltan { margin-left: auto; color: var(--mist); font-size: 13px; text-align: right; }
+.pie { color: var(--mist); font-size: 13px; margin-top: 26px; }
+.pie a { color: var(--turf); }
+
+/* Crédito: presente pero sin competir con nada de la pantalla. */
+.firma {
+  color: var(--mist); font-size: 11px; letter-spacing: .04em;
+  margin-top: 18px; opacity: .75;
+}
+
+/* ── mesa ─────────────────────────────────────────────────────────────── */
+body.mesa { background: var(--turf); color: var(--chalk); }
+.mesa-main { padding: 0 var(--pad) 40px; }
+
+.mesa-actual {
+  padding: 16px 0 20px; border-bottom: 1px solid rgba(244,246,241,.18);
+}
+.mesa-actual .eyebrow { color: #8FB3A0; }
+.mesa-actual-fila { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+.mesa-actual .dorsal { font-size: clamp(56px, 18vw, 88px); }
+.mesa-actual-nombre { font-size: 21px; font-weight: 600; }
+.mesa-actual-sub { color: #A9C0B2; font-size: 14px; }
+
+.mesa-botones { display: grid; gap: 10px; margin: 20px 0 8px; }
+.mesa-btn {
+  appearance: none; border: 0; cursor: pointer; font: inherit;
+  border-radius: 10px; padding: 26px 20px;
+  font-family: "Archivo", sans-serif; font-weight: 800; font-stretch: 82%;
+  font-size: 30px; letter-spacing: .01em; text-transform: uppercase;
+  background: var(--chalk); color: var(--turf);
+}
+.mesa-btn:active { transform: translateY(1px); }
+.mesa-btn.secundario {
+  background: transparent; color: var(--chalk);
+  box-shadow: inset 0 0 0 2px rgba(244,246,241,.35);
+  font-size: 20px; padding: 16px 20px;
+}
+.mesa-btn.peligro { color: #FFB3AA; box-shadow: inset 0 0 0 2px rgba(219,59,43,.6); }
+.mesa-btn[disabled] { opacity: .35; cursor: not-allowed; }
+
+.mesa-fila-chica { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+.mesa-link {
+  background: none; border: 0; cursor: pointer; font: inherit; font-size: 13px;
+  color: #A9C0B2; text-decoration: underline; padding: 6px 0;
+}
+
+.mesa-seccion { margin-top: 26px; }
+.mesa-seccion .eyebrow { color: #8FB3A0; }
+.mesa-lista { list-style: none; margin: 10px 0 0; padding: 0; }
+.mesa-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 10px 9px 12px; margin-bottom: 5px;
+  background: rgba(244,246,241,.07); border-radius: var(--r);
+}
+.mesa-item .dorsal { font-size: 23px; min-width: 40px; }
+.mesa-item-quien { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; }
+.mesa-item-sub { color: #A9C0B2; font-size: 12px; font-weight: 400; }
+.iconbtn {
+  appearance: none; border: 0; cursor: pointer;
+  width: 44px; height: 44px; border-radius: var(--r);
+  background: rgba(244,246,241,.12); color: var(--chalk);
+  font-size: 15px; line-height: 1;
+}
+.mesa-pistas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* Filas del programa: el nombre selecciona, las flechas mueven la pista. */
+.mesa-pista-sel {
+  flex: 1; min-width: 0; text-align: left;
+  appearance: none; border: 0; cursor: pointer; font: inherit;
+  background: none; color: var(--chalk);
+  font-size: 15px; font-weight: 500; padding: 4px 0;
+}
+.mesa-pista-sel .mesa-item-sub { display: block; }
+.mesa-item.viendo {
+  background: rgba(244,246,241,.16);
+  box-shadow: inset 3px 0 0 var(--chalk);
+}
+
+/* Aviso de "estás mirando otra pista": tiene que ser imposible de no ver, porque
+   los botones de avanzar desaparecen y hay que entender por qué. */
+.mesa-ojo {
+  background: rgba(242,180,23,.14);
+  border-left: 4px solid var(--tape);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 12px 14px; margin: 16px 0 4px;
+  font-size: 14px;
+}
+.mesa-ojo p { margin: 0 0 4px; }
+.mesa-ojo-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* Zona destructiva: rojo de barra caída, para que no se confunda con nada. */
+.mesa-peligro {
+  background: rgba(219,59,43,.12);
+  border-left: 4px solid var(--bar);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 12px 14px; margin-top: 10px; font-size: 14px;
+}
+.mesa-peligro p { margin: 0 0 6px; }
+.mesa-peligro code {
+  font-family: "IBM Plex Mono", monospace; font-size: 12px;
+  background: rgba(244,246,241,.12); padding: 1px 4px; border-radius: 3px;
+}
+
+/* Cargar orden desde archivo */
+.orden-carga { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.orden-carga select,
+.orden-carga input[type="file"] {
+  font: inherit; font-size: 14px;
+  color: var(--chalk); background: rgba(244,246,241,.1);
+  border: 1px solid rgba(244,246,241,.3); border-radius: var(--r);
+  padding: 9px 10px; max-width: 100%;
+}
+.orden-carga input[type="file"]::file-selector-button {
+  font: inherit; font-size: 13px; cursor: pointer; margin-right: 10px;
+  color: var(--turf); background: var(--chalk);
+  border: 0; border-radius: 4px; padding: 6px 10px;
+}
+.orden-check {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #A9C0B2; cursor: pointer;
+}
+.orden-check input { width: 18px; height: 18px; accent-color: var(--chalk); }
+.chip {
+  appearance: none; border: 0; cursor: pointer; font: inherit; font-size: 13px;
+  padding: 11px 14px; border-radius: 999px;
+  background: rgba(244,246,241,.1); color: var(--chalk);
+}
+.chip.activa { background: var(--chalk); color: var(--turf); font-weight: 600; }
+.chip.cerrada { opacity: .45; }
+
+/* ── avisos ───────────────────────────────────────────────────────────── */
+.aviso {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  max-width: 92vw; z-index: 40;
+  background: var(--slate); color: var(--chalk);
+  padding: 11px 16px; border-radius: var(--r); font-size: 14px;
+  box-shadow: 0 6px 22px rgba(0,0,0,.22);
+}
+.aviso.error { background: var(--bar); }
+.aviso[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

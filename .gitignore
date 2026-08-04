@@ -1,0 +1,12 @@
+node_modules/
+
+# La lista de inscripciones de un evento real: nombres de personas. Nunca al repo.
+# Se versiona sólo data/seed.example.csv, con datos inventados.
+data/seed.csv
+
+# Estado vivo del evento: se genera solo desde el CSV
+data/state.json
+data/state.json.tmp
+data/state.json.roto-*
+data/state.json.formato-anterior-*
+data/state.json.anterior-*

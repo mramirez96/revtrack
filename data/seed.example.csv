@@ -1,0 +1,23 @@
+ring,pista,categoria,altura,dorsal,guia,perro,raza
+Copa Ejemplo,Agility 1,G1,XS,101,Marta Ruiz,NALA,Border Collie
+Copa Ejemplo,Agility 1,G2,Small,102,Diego Sosa,TANGO,Kelpie
+Copa Ejemplo,Agility 1,G1,Small,103,Carolina Vega,UMA,Sheltie
+Copa Ejemplo,Agility 1,G2,Medium,104,Julián Ferrari,KILO,Mestizo
+Copa Ejemplo,Agility 1,G3,Medium,105,Rocío Medina,FRIDA,Cocker
+Copa Ejemplo,Agility 1,G1,Intermediate,106,Pablo Argüello,NILO,Mestizo
+Copa Ejemplo,Agility 1,G2,Intermediate,107,Sofía Bustos,KIRA,Border Collie
+Copa Ejemplo,Agility 1,G1,Large,108,Martín Ledesma,TOBY,Pastor Australiano
+Copa Ejemplo,Agility 1,G2,Large,109,Ana Godoy,LOLA,Border Collie
+Copa Ejemplo,Agility 1,G3,Large,110,Franco Peralta,ROCCO,Mestizo
+Copa Ejemplo,Jumping 1,G1,XS,101,Marta Ruiz,NALA,Border Collie
+Copa Ejemplo,Jumping 1,G2,Small,102,Diego Sosa,TANGO,Kelpie
+Copa Ejemplo,Jumping 1,G2,Medium,104,Julián Ferrari,KILO,Mestizo
+Copa Ejemplo,Jumping 1,G2,Intermediate,107,Sofía Bustos,KIRA,Border Collie
+Copa Ejemplo,Jumping 1,G1,Large,108,Martín Ledesma,TOBY,Pastor Australiano
+Copa Ejemplo,Jumping 1,G3,Large,110,Franco Peralta,ROCCO,Mestizo
+Copa Ejemplo,Final,G1,Small,103,Carolina Vega,UMA,Sheltie
+Copa Ejemplo,Final,G1,Large,108,Martín Ledesma,TOBY,Pastor Australiano
+Copa Ejemplo,Final,G2,Large,109,Ana Godoy,LOLA,Border Collie
+Copa Ejemplo,Iniciantes,G0,Small,,Lucía Ibarra,OREO,
+Copa Ejemplo,Iniciantes,G0,Medium,,Nicolás Duarte,CHINA,
+Copa Ejemplo,Iniciantes,G0,Large,,Valeria Ortiz,BRANCA,

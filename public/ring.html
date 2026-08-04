@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RevTrack</title>
+<meta name="theme-color" content="#0E3B2E">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="icon" href="/icono.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="tope">
+  <div class="wrap">
+    <span class="tope-ring" id="ringNombre">—</span>
+    <span class="tope-pista" id="pistaNombre"></span>
+    <span class="tope-estado">
+      <span class="pulso" id="pulso"></span>
+      <span id="frescura">conectando</span>
+    </span>
+  </div>
+</header>
+
+<nav class="pistas-nav">
+  <div class="wrap" id="pistas"></div>
+</nav>
+
+<section class="pista">
+  <div class="wrap">
+    <p class="eyebrow">En pista</p>
+    <div id="pistaCuerpo">
+      <p class="pista-vacia">Esperando el primer perro</p>
+    </div>
+  </div>
+</section>
+
+<section class="turno" id="turno">
+  <div class="wrap" id="turnoCuerpo"></div>
+</section>
+
+<section class="cola">
+  <div class="wrap">
+    <p class="eyebrow">Orden de salida</p>
+    <ul class="cola-lista" id="cola"></ul>
+    <p class="pie">
+      <a href="/">Ver todas las pistas</a>
+    </p>
+    <p class="firma">RevTrack · Powered by Revamp</p>
+  </div>
+</section>
+
+<div class="aviso" id="aviso" role="status" aria-live="polite" hidden></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/live.js"></script>
+</body>
+</html>

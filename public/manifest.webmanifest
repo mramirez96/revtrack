@@ -1,0 +1,12 @@
+{
+  "name": "RevTrack Agility",
+  "short_name": "RevTrack",
+  "description": "Seguí en vivo el orden de salida y a qué hora te toca correr",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F6F1",
+  "theme_color": "#0E3B2E",
+  "icons": [
+    { "src": "/icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

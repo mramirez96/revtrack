@@ -1,0 +1,22 @@
+{
+  "name": "revtrack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RevTrack — orden de salida en vivo para competencias de agility",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/run.js",
+    "reset": "node -e \"const fs=require('fs');for(const f of ['data/state.json','data/state.json.tmp'])fs.rmSync(f,{force:true});console.log('estado borrado, se vuelve a sembrar desde data/seed.csv')\""
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
