@@ -1,0 +1,49 @@
+# fly.toml app configuration file for revtrack
+#
+# See https://fly.io/docs/reference/configuration/
+
+app = 'revtrack'
+
+# Buenos Aires. La app se actualiza en vivo mientras corre una competencia; con la
+# región en Estados Unidos cada avance de la mesa daba la vuelta al continente.
+primary_region = 'eze'
+
+[build]
+
+[env]
+  # El estado tiene que vivir en el volumen, no en el disco de la máquina, que se
+  # borra en cada deploy. El seed.example.csv se sigue leyendo desde la imagen.
+  DATA_DIR = '/data'
+
+[http_service]
+  # Tiene que coincidir con el puerto que abre server.js (PORT || 3000). Fly no
+  # inyecta PORT solo: cuando esto decía 8080, el proxy golpeaba un puerto donde no
+  # había nadie escuchando y la máquina nunca pasaba el health check.
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  # Un chequeo TCP sólo confirma que algo abrió el puerto. Este confirma además que
+  # la app puede leer su estado y contestar.
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '3s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/api/resumen'
+
+# El estado del evento sobrevive deploys y reinicios acá.
+# Se crea una vez:  fly volumes create revtrack_data --region eze --size 1
+[mounts]
+  source = 'revtrack_data'
+  destination = '/data'
+
+[[vm]]
+  # 256 MB alcanza: el estado de un evento son ~300 inscripciones en memoria. Si en
+  # `fly logs` aparecen reinicios por OOM, subir a 512mb.
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
