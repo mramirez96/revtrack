@@ -697,10 +697,12 @@ async function accionarAviso(sock, evento, arg) {
     // El ejemplo va en la carpeta del proyecto; el estado, en otra. Es la forma en
     // que corre en Fly: volumen montado en /data, imagen con el seed.example.csv.
     fs.writeFileSync(path.join(DIR7, 'data', 'seed.example.csv'), FIXTURE);
+    // A propósito NO se crea la carpeta: en el contenedor, DATA_DIR tampoco existe
+    // en el primer arranque y la app tiene que crearla sola.
     const VOL = path.join(DIR7, 'volumen');
-    fs.mkdirSync(VOL, { recursive: true });
     const srvD = await arrancar(3115, { DATA_DIR: VOL }, DIR7);
-    chequear('arranca con DATA_DIR apuntando a otra carpeta', true);
+    chequear('arranca con DATA_DIR apuntando a una carpeta que no existía',
+      fs.existsSync(VOL), `${VOL} creada: ${fs.existsSync(VOL)}`);
     chequear('el estado se escribe en DATA_DIR, no en ./data',
       fs.existsSync(path.join(VOL, 'state.json')) && !fs.existsSync(path.join(DIR7, 'data', 'state.json')),
       `volumen: ${fs.existsSync(path.join(VOL, 'state.json'))}, ./data: ${fs.existsSync(path.join(DIR7, 'data', 'state.json'))}`);
