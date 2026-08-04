@@ -4,9 +4,7 @@
 
 app = 'revtrack'
 
-# Buenos Aires. La app se actualiza en vivo mientras corre una competencia; con la
-# región en Estados Unidos cada avance de la mesa daba la vuelta al continente.
-primary_region = 'eze'
+primary_region = 'gru'
 
 [build]
 
@@ -36,7 +34,6 @@ primary_region = 'eze'
     path = '/api/resumen'
 
 # El estado del evento sobrevive deploys y reinicios acá.
-# Se crea una vez:  fly volumes create revtrack_data --region eze --size 1
 [mounts]
   source = 'revtrack_data'
   destination = '/data'
