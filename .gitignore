@@ -8,5 +8,5 @@ data/seed.csv
 data/state.json
 data/state.json.tmp
 data/state.json.roto-*
-data/state.json.formato-anterior-*
+data/state.json.incompatible-*
 data/state.json.anterior-*

@@ -145,7 +145,7 @@ function sembrar(texto) {
     // `ring` es la cancha y es opcional: en una competencia de una sola cancha
     // —lo normal— no hace falta la columna, y el ring pasa a ser el evento.
     const nombreRing = r.ring || nombreEvento;
-    if (!(r.pista || r.manga) || !r.perro) { saltadas++; continue; }
+    if (!r.pista || !r.perro) { saltadas++; continue; }
     const ringId = slug(nombreRing);
     if (!s.rings.find(x => x.id === ringId)) {
       s.rings.push({ id: ringId, nombre: nombreRing });
@@ -153,9 +153,7 @@ function sembrar(texto) {
     // Una pista es la competencia corriendo un recorrido. Ni la altura ni el
     // grado la parten, porque corren todos seguidos, mezclados: esos dos datos
     // van por perro, y se muestran.
-    // La columna se llama `pista`; se acepta `manga` para no romper los CSV
-    // hechos antes del cambio de nombre.
-    const nombrePista = r.pista || r.manga;
+    const nombrePista = r.pista;
     const pistaId = `${ringId}--${slug(nombrePista)}`;
     let pista = s.pistas.find(x => x.id === pistaId);
     if (!pista) {
@@ -216,13 +214,14 @@ function cargar() {
   if (fs.existsSync(STATE_FILE)) {
     try {
       state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-      // Estado escrito antes de que "manga" pasara a llamarse "pista": las
-      // claves no coinciden y leerlo daría errores raros más adelante. Se aparta
-      // y se siembra de nuevo, que es lo único sensato sin un migrador.
-      if (!Array.isArray(state.pistas)) {
-        const viejo = `${STATE_FILE}.formato-anterior-${Date.now()}`;
+      // Un JSON válido no garantiza un estado usable: si le faltan colecciones, el
+      // servidor arrancaría igual y recién explotaría en el primer pedido. Se
+      // aparta y se siembra de nuevo, que es lo único sensato sin un migrador.
+      const completo = ['rings', 'pistas', 'inscripciones'].every(k => Array.isArray(state[k]));
+      if (!completo) {
+        const viejo = `${STATE_FILE}.incompatible-${Date.now()}`;
         fs.renameSync(STATE_FILE, viejo);
-        console.log(`data/state.json venía con el modelo anterior ("mangas").`);
+        console.log('data/state.json no tiene la forma que espera esta versión.');
         console.log(`Lo guardé como ${path.basename(viejo)} y siembro de nuevo desde el CSV.`);
       } else {
         if (!state.marcas) state.marcas = {};
@@ -508,7 +507,7 @@ function cargarOrden(ringId, { pistaId, csv, invertir } = {}) {
 
   const esDeEstaPista = f => {
     if (f.ring && slug(f.ring) !== ringId) return false;
-    const nombre = f.pista || f.manga;
+    const nombre = f.pista;
     if (nombre && `${ringId}--${slug(nombre)}` !== pista.id) return false;
     return true;
   };

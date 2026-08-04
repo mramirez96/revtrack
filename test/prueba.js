@@ -707,6 +707,20 @@ async function accionarAviso(sock, evento, arg) {
     chequear('avisa fuerte por consola', srv.salida().includes('¡OJO!'));
     await matar(srv.proc);
 
+    // JSON válido pero sin las colecciones que espera: arrancaría igual y
+    // explotaría en el primer pedido, así que se aparta antes.
+    fs.writeFileSync(STATE, JSON.stringify({ evento: { nombre: 'x' }, rings: [] }));
+    srv = await arrancar(3114);
+    const rIncompat = await get(3114, '/api/resumen');
+    chequear('un state.json de forma incompatible no rompe el arranque', rIncompat.status === 200,
+      `status ${rIncompat.status}`);
+    chequear('se aparta como .incompatible-',
+      fs.readdirSync(path.join(RAIZ, 'data')).some(f => f.startsWith('state.json.incompatible-')),
+      fs.readdirSync(path.join(RAIZ, 'data')).join(', '));
+    chequear('y siembra de nuevo desde el CSV',
+      rIncompat.cuerpo.rings.length === 2, JSON.stringify(rIncompat.cuerpo.rings?.map(r => r.id)));
+    await matar(srv.proc);
+
     /* ── 9. CSV con comas entre comillas ─────────────────────────────── */
     console.log('\n9. CSV con comillas');
     fs.rmSync(STATE, { force: true });

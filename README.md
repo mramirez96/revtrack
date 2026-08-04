@@ -11,7 +11,7 @@ because that is what the people using it speak — at a windy showground, with a
 in one hand and a dog in the other, "Sos el próximo · Andá al ingreso" reads at a
 glance in a way a translation would not. The code and the domain vocabulary are in
 Spanish for the same reason: the domain *is* Argentine agility (`pista`, `dorsal`,
-`guia`, `manga`). This document is in English so the design decisions are readable
+`guia`, `altura`). This document is in English so the design decisions are readable
 without speaking it.
 
 ---
