@@ -18,12 +18,13 @@ const etiquetas = i => [i.altura, i.categoria]
 let snap = null;
 // Qué pista está mirando la mesa. `null` = la que está corriendo.
 let viendo = null;
-let pin = localStorage.getItem('mesaPin') || '';
+let token = localStorage.getItem('mesaToken') || '';
+try { localStorage.removeItem('mesaPin'); } catch { /* nada que hacer: era la versión vieja, guardaba el PIN */ }
 let autorizado = false;
-let intentoPin = false;   // true sólo cuando alguien tipeó un PIN y lo mandó
 let recibidoEn = 0;
-
-const socket = io({ transports: ['websocket', 'polling'] });
+// Estado de la suscripción de Realtime — ver la nota en live.js sobre por qué
+// "en vivo" ahora se lee directo de acá y no de un heartbeat de servidor.
+let conectado = false;
 
 /* ── avisos ──────────────────────────────────────────────────────────── */
 let avisoTimer = null;
@@ -39,9 +40,8 @@ function aviso(msg, esError, ms = 3500) {
 function frescura() {
   const pulso = el('pulso');
   const txt = el('frescura');
-  if (!socket.connected) { pulso.className = 'pulso muerto'; txt.textContent = 'sin señal'; return; }
-  const seg = Math.round((Date.now() - recibidoEn) / 1000);
-  pulso.className = seg < 75 ? 'pulso' : 'pulso frio';
+  if (!conectado) { pulso.className = 'pulso muerto'; txt.textContent = 'sin señal'; return; }
+  pulso.className = 'pulso';
   txt.textContent = autorizado ? 'mesa · en vivo' : 'sólo lectura';
 }
 setInterval(frescura, 15000);
@@ -199,33 +199,33 @@ function render() {
 
   // Los botones de avanzar no existen cuando se está mirando otra pista.
   const btnSig = el('btnSiguiente');
-  if (btnSig) btnSig.onclick = () => socket.emit('siguiente');
+  if (btnSig) btnSig.onclick = () => accion('siguiente');
   const btnAus = el('btnAusente');
   if (btnAus) btnAus.onclick = () => {
     const objetivo = enPista || pendientes[0];
     if (!objetivo) return;
     const quien = `${objetivo.perro} (${objetivo.guia}${objetivo.dorsal ? `, dorsal ${objetivo.dorsal}` : ''})`;
     if (confirm(`¿Marcar ausente a ${quien}?`)) {
-      socket.emit('ausente', objetivo.id);
+      accion('ausente', { id: objetivo.id });
     }
   };
-  el('btnDeshacer').onclick = () => socket.emit('deshacer');
+  el('btnDeshacer').onclick = () => accion('deshacer');
 
   const btnVolver = el('btnVolverActiva');
   if (btnVolver) btnVolver.onclick = () => verPista(null);
   const btnAbrir = el('btnAbrirEsta');
   if (btnAbrir) btnAbrir.onclick = () => {
     if (confirm(`¿Abrir ${snap.pista.nombre}? La que está en curso queda en pausa.`)) {
-      socket.emit('abrir_pista', snap.pista.id);
+      accion('abrir_pista', { id: snap.pista.id });
       verPista(null);
     }
   };
 
   el('app').querySelectorAll('[data-mover]').forEach(b => {
-    b.onclick = () => socket.emit('mover', { id: b.dataset.mover, delta: Number(b.dataset.delta) });
+    b.onclick = () => accion('mover', { id: b.dataset.mover, delta: Number(b.dataset.delta) });
   });
   el('app').querySelectorAll('[data-ausente]').forEach(b => {
-    b.onclick = () => socket.emit('ausente', b.dataset.ausente);
+    b.onclick = () => accion('ausente', { id: b.dataset.ausente });
   });
   const btnOrden = el('btnOrden');
   if (btnOrden) btnOrden.onclick = () => {
@@ -237,7 +237,7 @@ function render() {
     const invertir = el('ordenInvertir').checked;
     const lector = new FileReader();
     lector.onerror = () => aviso('No pude leer el archivo.', true);
-    lector.onload = () => socket.emit('cargar_orden', { pistaId, csv: String(lector.result), invertir });
+    lector.onload = () => accion('cargar_orden', { pistaId, csv: String(lector.result), invertir });
     lector.readAsText(archivo, 'utf-8');
   };
 
@@ -253,9 +253,7 @@ function render() {
     }
     const lector = new FileReader();
     lector.onerror = () => aviso('No pude leer el archivo.', true);
-    lector.onload = () => socket.emit('nueva_competencia', {
-      csv: String(lector.result), confirmar: 'BORRAR'
-    });
+    lector.onload = () => nuevaCompetenciaSubmit(String(lector.result));
     lector.readAsText(archivo, 'utf-8');
   };
 
@@ -265,7 +263,7 @@ function render() {
     b.onclick = () => verPista(b.dataset.ver);
   });
   el('app').querySelectorAll('[data-mpista]').forEach(b => {
-    b.onclick = () => socket.emit('mover_pista', { id: b.dataset.mpista, delta: Number(b.dataset.delta) });
+    b.onclick = () => accion('mover_pista', { id: b.dataset.mpista, delta: Number(b.dataset.delta) });
   });
 
   frescura();
@@ -283,57 +281,155 @@ function renderPin() {
         <button class="btn" id="btnPin" style="background:var(--chalk);color:var(--turf)">Entrar</button>
       </div>
     </section>`;
-  const enviar = () => {
-    pin = el('inPin').value.trim();
-    if (!pin) return;
-    intentoPin = true;
-    localStorage.setItem('mesaPin', pin);
-    socket.emit('join', { ringId, pin });
-  };
+  const enviar = () => entrarConPin(el('inPin').value.trim());
   el('btnPin').onclick = enviar;
   el('inPin').onkeydown = e => { if (e.key === 'Enter') enviar(); };
 }
 
-/* ── socket ──────────────────────────────────────────────────────────── */
+/* ── token de mesa ───────────────────────────────────────────────────── */
+
+function payloadDe(tok) {
+  if (!tok || !tok.includes('.')) return null;
+  try {
+    let b64 = tok.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    return JSON.parse(atob(b64));
+  } catch { return null; }
+}
+
+// El token no se verifica del lado del cliente (no hay cómo, sin el secreto) —
+// esto es sólo para decidir qué pantalla mostrar. La autorización real la
+// hace el servidor en cada pedido.
+function tokenVigente(tok) {
+  const p = payloadDe(tok);
+  return !!p && p.r === ringId && p.e > Date.now();
+}
+
+async function entrarConPin(pin) {
+  if (!pin) return;
+  try {
+    const r = await fetch('/api/mesa/entrar', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ringId, pin })
+    });
+    const d = await r.json();
+    if (!r.ok) return aviso(r.status === 429 ? d.error : 'PIN incorrecto', true);
+    token = d.token;
+    localStorage.setItem('mesaToken', token);
+    autorizado = true;
+    render();
+  } catch {
+    aviso('No pude conectarme al servidor.', true);
+  }
+}
+
+/* ── acciones + tiempo real ──────────────────────────────────────────── */
+
+async function accion(ruta, body) {
+  try {
+    const r = await fetch(`/api/ring/${encodeURIComponent(ringId)}/${ruta}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(body || {})
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 401) {
+      // El token venció o dejó de servir: misma pantalla que si nunca hubiera
+      // entrado, sin perder de vista el error.
+      token = '';
+      localStorage.removeItem('mesaToken');
+      autorizado = false;
+      render();
+      return aviso('Sesión de mesa vencida. Ingresá el PIN de nuevo.', true);
+    }
+    if (!r.ok) return aviso(d.error || 'No se pudo completar la acción.', true);
+    // El reporte de "cargar orden" tiene varias partes y hay que poder leerlo;
+    // el snapshot actualizado llega solo, por el canal de Realtime.
+    if (d.aviso) aviso(d.aviso, false, 14000);
+  } catch {
+    aviso('No pude conectarme al servidor.', true);
+  }
+}
+
+async function nuevaCompetenciaSubmit(csv) {
+  try {
+    const r = await fetch('/api/nueva_competencia', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ csv, confirmar: 'BORRAR' })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return aviso(d.error || 'No se pudo cargar la competencia.', true);
+    // La mesa se va derecho a la competencia nueva, sin esperar. Su URL vieja
+    // apunta a un ring que probablemente ya no exista. El reporte cruza la
+    // navegación por sessionStorage, así que se lee del otro lado en vez de
+    // retrasar el salto.
+    try { if (d.aviso) sessionStorage.setItem('avisoPendiente', d.aviso); } catch { /* sin storage */ }
+    location.href = d.ringId ? `/mesa/${encodeURIComponent(d.ringId)}` : '/';
+  } catch {
+    aviso('No pude conectarme al servidor.', true);
+  }
+}
 
 function verPista(id) {
   viendo = id;
-  socket.emit('ver_pista', id);
+  cargarSnapshot();
 }
 
-socket.on('connect', () => socket.emit('join', { ringId, pin, pistaId: viendo }));
+// Si el ring de la URL no existe, la pantalla quedaba en "Cargando…" sin
+// salida ni explicación.
+function ringInexistente() {
+  el('app').innerHTML = `
+    <section class="mesa-seccion">
+      <p class="eyebrow">Esta competencia no existe</p>
+      <p class="mesa-actual-nombre" style="margin:8px 0 6px">${esc(ringId)}</p>
+      <p class="mesa-actual-sub">
+        Puede ser que se haya cargado otra competencia desde entonces, o que la
+        dirección esté mal escrita.
+      </p>
+      <p style="margin-top:14px"><a class="btn" href="/" style="text-decoration:none">Ir al inicio</a></p>
+    </section>`;
+}
 
-socket.on('snapshot', s => { snap = s; recibidoEn = Date.now(); render(); });
-
-socket.on('latido', () => { recibidoEn = Date.now(); frescura(); });
-
-socket.on('mesa_ok', ok => {
-  autorizado = ok;
-  if (!ok) {
-    localStorage.removeItem('mesaPin');
-    pin = '';
-    if (intentoPin) aviso('PIN incorrecto', true);
+async function cargarSnapshot() {
+  try {
+    const q = viendo ? `?pista=${encodeURIComponent(viendo)}` : '';
+    const r = await fetch(`/api/ring/${encodeURIComponent(ringId)}${q}`);
+    if (r.status === 404) return ringInexistente();
+    snap = await r.json();
+    recibidoEn = Date.now();
+    render();
+  } catch {
+    aviso('No pude conectarme al servidor.', true);
   }
-  intentoPin = false;
-  render();
-});
+}
 
-socket.on('disconnect', frescura);
-socket.on('error_app', m => aviso(m, true));
+// El broadcast manda un snapshot por cada pista del ring; sólo importa el de
+// la que se está mirando (o, si no se eligió ninguna, la que sea la activa en
+// este momento — así se sigue el puntero cuando se cierra una pista y se abre
+// la próxima).
+function alRecibirSnapshot(s) {
+  if (viendo ? s.pista?.id === viendo : s.esActiva) {
+    snap = s;
+    recibidoEn = Date.now();
+    render();
+  }
+}
 
-// El reporte de "cargar orden" tiene varias partes y hay que poder leerlo.
-socket.on('aviso_app', m => aviso(m, false, 14000));
+autorizado = tokenVigente(token);
+cargarSnapshot();
+RT.suscribir(`ring:${ringId}`, { snapshot: alRecibirSnapshot }, c => { conectado = c; frescura(); });
+RT.suscribir('global', { recargar: () => location.reload() });
 
-// Cambió la competencia entera: lo que hay en pantalla ya no existe. Los demás
-// recargan al instante; el que la cargó tiene unos segundos para leer el reporte.
-socket.on('recargar', () => location.reload());
-socket.on('aviso_app', m => {
-  if (/Competencia nueva cargada/.test(m)) setTimeout(() => location.reload(), 5000);
-});
+// Reporte que quedó de la navegación anterior (ver nuevaCompetenciaSubmit).
+try {
+  const pendiente = sessionStorage.getItem('avisoPendiente');
+  if (pendiente) { sessionStorage.removeItem('avisoPendiente'); aviso(pendiente, false, 14000); }
+} catch { /* sin storage */ }
 
 // Atajos para quien usa la mesa con teclado o pedal.
 document.addEventListener('keydown', e => {
   if (!autorizado || e.target.tagName === 'INPUT') return;
-  if (e.code === 'Space' || e.key === 'ArrowRight') { e.preventDefault(); socket.emit('siguiente'); }
-  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); socket.emit('deshacer'); }
+  if (e.code === 'Space' || e.key === 'ArrowRight') { e.preventDefault(); accion('siguiente'); }
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); accion('deshacer'); }
 });

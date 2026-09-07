@@ -706,7 +706,10 @@ function nuevaCompetencia({ csv, confirmar } = {}) {
   console.log(`  (lo anterior: ${previo.inscripciones} inscripciones, ${previo.corridos} corridos, respaldado)`);
 
   return {
-    aviso: `Competencia nueva cargada: ${partes.join(' · ')}. El estado anterior quedó respaldado en data/.`
+    // A dónde tiene que ir la mesa: su URL vieja apunta a un ring que puede no
+    // existir más, y ahí la pantalla queda en "Ring inexistente".
+    ringId: nuevo.rings[0]?.id || null,
+    aviso: `Competencia nueva cargada: ${partes.join(' · ')}.`
   };
 }
 
@@ -872,7 +875,8 @@ io.on('connection', socket => {
     if (!esMesa) return socket.emit('error_app', 'Necesitás el PIN de mesa para cargar una competencia.');
     const r = nuevaCompetencia(p);
     if (typeof r === 'string') return socket.emit('error_app', r);
-    socket.emit('aviso_app', r.aviso);
+    // La mesa se va derecho a la competencia nueva; el reporte viaja con ella.
+    socket.emit('ir_a_mesa', { ringId: r.ringId, aviso: r.aviso });
     socket.broadcast.emit('recargar');
     io.to('lobby').emit('resumen', resumen());
   });
@@ -881,6 +885,11 @@ io.on('connection', socket => {
 
 server.listen(PORT, () => {
   console.log(`\n  RevTrack escuchando en http://localhost:${PORT}`);
-  console.log(`  Rings: ${state.rings.map(r => `/ring/${r.id}`).join('  ')}`);
-  console.log(`  Mesa:  ${state.rings.map(r => `/mesa/${r.id}`).join('  ')}   PIN: ${MESA_PIN}\n`);
+  console.log(`  Rings: ${state.rings.map(r => `/ring/${r.id}`).join('  ') || '(sin competencia cargada)'}`);
+  // El PIN sólo se imprime cuando es el de por defecto, que no es secreto y sirve
+  // para arrancar en local. Si viene por variable de entorno es porque alguien lo
+  // eligió: imprimirlo lo deja escrito en el log del servidor, que en un deploy
+  // ve cualquiera que tenga acceso a la consola.
+  const mesas = state.rings.map(r => `/mesa/${r.id}`).join('  ') || '(sin competencia cargada)';
+  console.log(`  Mesa:  ${mesas}${process.env.MESA_PIN ? '' : `   PIN: ${MESA_PIN}`}\n`);
 });

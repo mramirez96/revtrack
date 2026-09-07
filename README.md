@@ -16,18 +16,38 @@ without speaking it.
 
 ---
 
+## Architecture
+
+RevTrack runs on **Vercel + Supabase**, at zero cost: Vercel serves the static
+front end and a serverless function under `/api/*`; Supabase holds the state in
+Postgres and pushes live updates to every phone over Realtime Broadcast. There is
+no long-running process and no volume to mount — the previous single-process
+Node + Socket.io + `data/state.json` design (still in `server.js`, still
+deployable to Fly.io) is kept only as a fallback until the new path is proven in
+production; see [Deploy](#deploy) below for why, and the *Decisions* section
+further down for the reasoning behind each piece of the new design.
+
 ## Run it
+
+There is no build step: the front end is plain HTML and JavaScript.
+
+**Locally, against the new stack:**
 
 ```bash
 npm install
-npm start
+supabase start                          # local Postgres + Realtime, via Docker
+psql "$(supabase status -o env | grep DB_URL | cut -d= -f2-)" \
+  -f supabase/migrations/0001_init.sql   # once, to create the tables
+SUPABASE_DB_URL=<from `supabase status`> \
+SUPABASE_URL=<from `supabase status`> \
+SUPABASE_ANON_KEY=<from `supabase status`> \
+MESA_SECRET=<any long random string>    \
+  vercel dev
 ```
 
-Open `http://localhost:3000`. There is no build step: the front end is plain HTML and
-JavaScript, served by the same Node process that handles the websocket.
-
-With no `data/seed.csv` present it seeds from `data/seed.example.csv` (invented data)
-so a fresh clone works immediately.
+With no data loaded yet, the first request seeds from `data/seed.example.csv`
+(invented data) so a fresh clone works immediately. To load a real event ahead of
+time: `SUPABASE_DB_URL=... npm run seed:supabase data/seed.csv`.
 
 | Route         | Who         | What                                                    |
 |---------------|-------------|---------------------------------------------------------|
@@ -35,11 +55,15 @@ so a fresh clone works immediately.
 | `/ring/:id`   | competitors | live order for a round, plus *how long until my turn*    |
 | `/mesa/:id`   | the table   | advance, mark absent, reorder, import, switch rounds     |
 
-The table is behind a PIN (`1234` by default, `MESA_PIN=xxxx npm start` to change it).
+The table is behind a PIN (`1234` by default, `MESA_PIN=xxxx` to change it).
 
 ```bash
-npm test    # 189 assertions across 5 suites
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:54322/postgres npm test
 ```
+
+189+ assertions across 5 suites — the integration suite needs a throwaway Postgres
+(the local `supabase start` one works, or any disposable container) and creates its
+own schema inside it, so it never touches real data.
 
 ## The problem it solves
 
@@ -139,63 +163,104 @@ The view states which of the two it is using. For a round that hasn't started th
 no honest clock, so it shows the position (`5º de 32`) instead of inventing a time.
 
 **Permissions are enforced on the server.** Hiding the buttons is not access control:
-every table action is rejected unless it comes from an authenticated connection, and
-is validated against the course that connection joined. Five wrong PIN attempts locks
+every table action is rejected unless it carries a valid signed token for *that*
+course — issued only after the PIN checks out, verified server-side on every single
+request (`lib/auth.js`), not just once at connect time. Five wrong PIN attempts locks
 that IP out for a minute, which turns guessing four digits from seconds into a day.
 
-**Writes are atomic and bounded.** `state.json` is written to a temp file and renamed,
-so a power cut cannot truncate it; if it is ever unreadable the server sets it aside,
-says so loudly, and reseeds rather than refusing to start. Consecutive changes are
-coalesced into one write, with a ceiling so a burst can't postpone persistence for as
-long as the burst lasts.
+**Every action is one Postgres transaction, serialized behind a lock.** Each table
+action loads the whole state, mutates it with the same functions the single-process
+version used (`lib/estado.js`), and writes it back inside one transaction holding a
+Postgres advisory lock (`lib/db.js:conLock`) — same serialization guarantee a single
+Node event loop gave for free, made explicit now that there's no single process. It
+also fixes the one real limitation the old design had: two people operating the table
+at once no longer means last-write-wins.
 
-**Broadcast is per connection, not per room.** Two people can be looking at different
-rounds of the same competition, so each receives the snapshot of what is actually on
-their screen.
+**Broadcast is per ring, filtering happens on the phone.** After an action, the server
+publishes a snapshot for every course in that ring to one Supabase Realtime channel
+(`lib/realtime.js`) — not a message routed per viewer, because there's no persistent
+connection left to route from. Each phone already knows which course it's looking at
+and ignores the rest (`alRecibirSnapshot` in `live.js`/`mesa.js`); the same guarantee
+as before — a change in Ring 2 never touches what a Ring 1 phone shows — just enforced
+on the other end of the wire.
 
 ## Layout
 
 ```
-server.js          state, actions, snapshots, sockets (~760 lines, 6 sections)
-data/seed.csv      the event (gitignored)
-data/seed.example.csv  invented data, so a clone runs
-public/index.html  programme
-public/ring.html   competitor view  + live.js
-public/mesa.html   table control    + mesa.js
-public/app.css     all three views
-public/sw.js       shell cache, so the page opens with no signal
-test/run.js        npm test
+api/index.js        the Express app behind /api/* — routes only, no business logic
+lib/dominio.js       pure functions: CSV parsing, height ordering, sembrar()
+lib/estado.js        queries + actions (siguiente, mover, deshacer…) — same shape
+                      as the old server.js, operating on a `state` passed in
+lib/db.js             Postgres: load/save the whole state, per-ring undo, the lock
+lib/auth.js           PIN check, rate limit, signed mesa tokens
+lib/realtime.js        publishes snapshots to Supabase Realtime after each action
+supabase/migrations/   the Postgres schema
+scripts/seed.js         load a real event's CSV into Supabase ahead of time
+public/index.html    programme
+public/ring.html     competitor view  + live.js
+public/mesa.html     table control    + mesa.js
+public/rt.js          tiny Supabase Realtime subscription helper, shared by all three
+public/app.css        all three views
+public/sw.js           shell cache, so the page opens with no signal
+test/run.js            npm test
+server.js, fly.toml,   the previous single-process deploy — kept as a fallback,
+Dockerfile              see Deploy below
 ```
 
-Reading path: `sembrar()` shows the whole model, `snapshot()` shows everything the
-views can possibly render, `siguiente()` is the core action, and `accion()` is the
-wrapper every table action goes through.
+Reading path: `dominio.sembrar()` shows the whole model, `estado.snapshot()` shows
+everything the views can possibly render, `estado.siguiente()` is the core action, and
+`api/index.js:accionRing()` is the wrapper every table action goes through.
+
+## Deploy
+
+**Primary: Vercel + Supabase, at zero cost.**
+
+1. Create a Supabase project, run `supabase/migrations/0001_init.sql` against it
+   (SQL editor, or `psql "$SUPABASE_DB_URL" -f supabase/migrations/0001_init.sql`).
+2. On Vercel, import the repo and set: `SUPABASE_DB_URL` (the pooled connection
+   string, Transaction mode), `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `MESA_PIN`, `MESA_SECRET` (any long random string —
+   signs the mesa session token, distinct from `MESA_PIN`).
+3. Deploy. The first request auto-seeds from `data/seed.example.csv`; load the real
+   event beforehand with `SUPABASE_DB_URL=... npm run seed:supabase data/seed.csv`.
+
+No volume, no always-on process, nothing to patch — Vercel and Supabase's free tiers
+cover a club running a few events a year comfortably.
+
+**Fallback: Fly.io**, via `server.js` + `fly.toml` + `Dockerfile` — the original
+single-process design, kept deployable until the Vercel path has run a real event.
+Needs a persistent volume (see the comments in `fly.toml`) for `data/state.json` to
+survive deploys and restarts. Once the new path is proven, these three files —
+and `data/seed.csv`'s role as the on-disk seed — go away.
 
 ## Tests
 
-189 assertions, no browser and no test framework:
+189+ assertions, no browser and no test framework:
 
-- **Integration** boots the real server in a throwaway sandbox and exercises every
-  action and every guard — permissions, PIN lockout, cross-course isolation, per-course
-  undo, corrupted state recovery, CSV quoting, order imports, competition reload.
+- **Integration** (`test/prueba.js`) boots the real `api/index.js` against a
+  throwaway Postgres schema and exercises every action and every guard —
+  permissions, PIN lockout, cross-course isolation, per-course undo, CSV quoting,
+  order imports, competition reload, survival across a server restart.
 - **View suites** run `live.js` and `mesa.js` inside `node:vm` against a minimal DOM,
-  which is enough to assert what actually gets rendered.
+  which is enough to assert what actually gets rendered — including that a
+  broadcast for a course you're not looking at gets ignored.
 
-The integration suite never touches the working `data/` directory — it copies the
-project into a sandbox first. That is not paranoia; it is a bug that already happened
-once.
+The integration suite creates its own Postgres schema, named after the process id, and
+drops it when it's done — it never touches real data, and two runs in parallel don't
+collide. Needs `TEST_DATABASE_URL` (or `SUPABASE_DB_URL`) pointing at *some* disposable
+Postgres — `supabase start` locally, or any throwaway container.
 
 ## Limits
 
-- **Single process, JSON state.** Fine for one event. Two people operating the same
-  table at once can overwrite each other — last write wins. Postgres when that matters.
-- **The PIN is a PIN**, not authentication. It travels over the websocket and is stored
-  on the phone. Enough to stop a curious bystander from advancing the order.
-- **No HTTPS**, so the service worker only registers on `localhost` or behind a TLS
-  proxy. Offline mode needs a certificate in production.
+- **The PIN is a PIN**, not authentication. The mesa session token it hands out lives
+  in `localStorage` on the phone. Enough to stop a curious bystander from advancing
+  the order.
 - **No timing or scoring.** No times, faults, eliminations or results — deliberately.
   Starting order is the problem this solves; the order for a round that depends on the
   previous round's results is imported from a file instead.
+- **"Live" depends on Supabase Realtime's connection state**, not a server heartbeat
+  (the old design had one; see the note in `public/live.js`). A dropped websocket
+  reads as "sin señal" almost immediately, same as before — just measured differently.
 
 ---
 

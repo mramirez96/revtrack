@@ -48,7 +48,8 @@ const ctx = {
     removeItem: k => { delete store[k]; }
   },
   document: { getElementById: nodo, addEventListener: () => {}, hidden: false, title: '' },
-  io: () => ({ on: () => {}, emit: () => {}, connected: true }),
+  fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+  RT: { suscribir: async () => ({}) },
   setInterval: () => 0, clearInterval: () => {}, setTimeout: () => 0, clearTimeout: () => {}
 };
 ctx.globalThis = ctx;

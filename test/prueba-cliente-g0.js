@@ -42,7 +42,8 @@ function correr(lista, clave, ph = {}) {
       removeItem: k => { delete store[k]; }
     },
     document: { getElementById: nodo, addEventListener: () => {}, hidden: false, title: '' },
-    io: () => ({ on: () => {}, emit: () => {}, connected: true }),
+    fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+    RT: { suscribir: async () => ({}) },
     setInterval: () => 0, clearInterval: () => {}, setTimeout: () => 0, clearTimeout: () => {}
   };
   ctx.globalThis = ctx;
@@ -137,7 +138,8 @@ const ctx = {
     URLSearchParams, URL, history: { replaceState: () => {} }, navigator: {},
   localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; }, removeItem: k => { delete store[k]; } },
   document: { getElementById: nodo, addEventListener: () => {}, hidden: false, title: '' },
-  io: () => ({ on: () => {}, emit: () => {}, connected: true }),
+  fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+  RT: { suscribir: async () => ({}) },
   setInterval: () => 0, clearInterval: () => {}, setTimeout: () => 0, clearTimeout: () => {}
 };
 ctx.globalThis = ctx;

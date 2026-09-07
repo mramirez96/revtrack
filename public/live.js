@@ -119,7 +119,7 @@ function renderPistas() {
       const url = new URL(location.href);
       url.searchParams.set('pista', pistaId);
       history.replaceState(null, '', url);
-      socket.emit('ver_pista', pistaId);
+      cargarSnapshot();
     };
   });
 }
@@ -273,19 +273,21 @@ function guardarClave() {
 
 /* ── frescura del dato ───────────────────────────────────────────────── */
 
+// "En vivo" ahora es directamente el estado de la suscripción de Realtime, no
+// un pulso de servidor: mientras el canal está conectado no hace falta nada
+// más para saber que lo que se ve sigue vigente.
+let conectado = false;
+
 function frescura() {
   const seg = Math.round((Date.now() - recibidoEn) / 1000);
   const pulso = el('pulso');
   const txt = el('frescura');
-  if (!socket.connected) {
+  if (!conectado) {
     pulso.className = 'pulso muerto';
     txt.textContent = seg < 90 ? 'sin señal' : `sin señal · ${minutos(seg)} atrás`;
-  } else if (seg < 75) {
+  } else {
     pulso.className = 'pulso';
     txt.textContent = 'en vivo';
-  } else {
-    pulso.className = 'pulso frio';
-    txt.textContent = `hace ${minutos(seg)}`;
   }
 }
 setInterval(() => { if (snap) { frescura(); } }, 15000);
@@ -302,12 +304,7 @@ function aviso(msg, esError) {
   avisoTimer = setTimeout(() => { a.hidden = true; }, 4000);
 }
 
-/* ── socket + caché ──────────────────────────────────────────────────── */
-
-// El socket se crea antes de pintar la caché: `render()` termina en `frescura()`,
-// que lo lee. Si se declaraba después, el primer render tiraba ReferenceError
-// y el `catch` de acá abajo se lo comía, dejando el encabezado en "conectando".
-const socket = io({ transports: ['websocket', 'polling'] });
+/* ── carga + tiempo real ─────────────────────────────────────────────── */
 
 function guardarCache() {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ snap, recibidoEn })); }
@@ -324,36 +321,62 @@ try {
   }
 } catch { /* caché corrupta, se ignora */ }
 
-socket.on('connect', () => { socket.emit('join', { ringId, pistaId }); frescura(); });
+// Si el ring de la URL no existe, la pantalla quedaba en "Cargando…" sin
+// salida ni explicación.
+function ringInexistente() {
+  document.querySelector('main').innerHTML = `
+    <div class="wrap">
+      <p class="eyebrow">Esta competencia no existe</p>
+      <h1>${esc(ringId)}</h1>
+      <p class="pie">Puede ser que se haya cargado otra competencia desde entonces,
+      o que la dirección esté mal escrita.</p>
+      <p style="margin-top:14px"><a class="btn" href="/" style="text-decoration:none">Ir al inicio</a></p>
+    </div>`;
+}
 
-socket.on('snapshot', s => {
-  snap = s;
-  recibidoEn = Date.now();
-  guardarCache();
-  render();
-});
+async function cargarSnapshot() {
+  try {
+    const q = pistaId ? `?pista=${encodeURIComponent(pistaId)}` : '';
+    const r = await fetch(`/api/ring/${encodeURIComponent(ringId)}${q}`);
+    if (r.status === 404) return ringInexistente();
+    snap = await r.json();
+    recibidoEn = Date.now();
+    guardarCache();
+    render();
+  } catch {
+    aviso('No pude conectarme al servidor.', true);
+  }
+}
 
-// El servidor confirma cada 30 s que no hubo cambios. Sin esto, en una pista
-// lenta el encabezado decía "hace 3 min" con la conexión intacta.
-socket.on('latido', () => {
-  if (!snap) return;
-  recibidoEn = Date.now();
-  guardarCache();
-  frescura();
-});
+// El broadcast manda un snapshot por cada pista del ring; sólo importa el de
+// la que estoy mirando (o, si no elegí ninguna, el de la que sea la activa en
+// este momento — así se sigue el puntero cuando la mesa cierra una pista y
+// abre la próxima).
+function alRecibirSnapshot(s) {
+  if (pistaId ? s.pista?.id === pistaId : s.esActiva) {
+    snap = s;
+    recibidoEn = Date.now();
+    guardarCache();
+    render();
+  }
+}
 
-socket.on('disconnect', frescura);
-socket.on('error_app', m => aviso(m, true));
-
-// La mesa cargó otra competencia: lo que está en pantalla ya no existe. Se limpia
-// la caché de este ring para no repintar un evento que se fue.
-socket.on('recargar', () => {
-  try { localStorage.removeItem(CACHE_KEY); } catch { /* nada que hacer */ }
-  location.reload();
+cargarSnapshot();
+RT.suscribir(`ring:${ringId}`, { snapshot: alRecibirSnapshot }, c => { conectado = c; frescura(); });
+// La mesa cargó otra competencia: lo que está en pantalla ya no existe. Se
+// limpia la caché de este ring para no repintar un evento que se fue.
+RT.suscribir('global', {
+  recargar: () => {
+    try { localStorage.removeItem(CACHE_KEY); } catch { /* nada que hacer */ }
+    location.reload();
+  }
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) { frescura(); if (socket.connected) socket.emit('join', { ringId, pistaId }); }
+  // Los navegadores mobile pausan el websocket con la pestaña en segundo
+  // plano; al volver, un fetch nuevo es más seguro que confiar en que no se
+  // haya perdido ningún mensaje mientras tanto.
+  if (!document.hidden) { frescura(); cargarSnapshot(); }
 });
 
 if ('serviceWorker' in navigator) {

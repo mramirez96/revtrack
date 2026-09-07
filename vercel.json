@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    { "source": "/ring/:ringId", "destination": "/ring.html" },
+    { "source": "/mesa/:ringId", "destination": "/mesa.html" },
+    { "source": "/api/:path*", "destination": "/api/index.js" }
+  ],
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "data/seed.example.csv"
+    }
+  }
+}

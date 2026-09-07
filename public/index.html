@@ -24,16 +24,17 @@
   </div>
 </main>
 
-<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="/rt.js"></script>
 <script>
 'use strict';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const socket = io({ transports: ['websocket', 'polling'] });
 
-socket.on('connect', () => socket.emit('lobby'));
-socket.on('recargar', () => location.reload());
+fetch('/api/resumen').then(r => r.json()).then(pintar).catch(() => {});
+RT.suscribir('lobby', { resumen: pintar });
+RT.suscribir('global', { recargar: () => location.reload() });
 
-socket.on('resumen', d => {
+function pintar(d) {
   document.getElementById('evento').textContent = d.evento.nombre;
   document.getElementById('fecha').textContent = new Date(d.evento.fecha + 'T12:00')
     .toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -77,7 +78,7 @@ document.getElementById('rings').innerHTML = d.rings.map(r => `
 document.getElementById('pie').innerHTML = 'Tocá una pista para ver su orden de salida. Si estás en la mesa, entrá por ' +
   d.rings.map(r => `<a href="/mesa/${encodeURIComponent(r.id)}">/mesa/${esc(r.id)}</a>`).join(' o ') +
   '. Se corre de a una pista por vez: la que está en curso queda arriba resaltada.';
-});
+}
 </script>
 </body>
 </html>

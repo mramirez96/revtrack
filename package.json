@@ -6,11 +6,14 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "dev": "node scripts/dev.js",
     "test": "node test/run.js",
-    "reset": "node -e \"const fs=require('fs');for(const f of ['data/state.json','data/state.json.tmp'])fs.rmSync(f,{force:true});console.log('estado borrado, se vuelve a sembrar desde data/seed.csv')\""
+    "reset": "node -e \"const fs=require('fs');for(const f of ['data/state.json','data/state.json.tmp'])fs.rmSync(f,{force:true});console.log('estado borrado, se vuelve a sembrar desde data/seed.csv')\"",
+    "seed:supabase": "node scripts/seed.js"
   },
   "dependencies": {
     "express": "^4.19.2",
+    "pg": "^8.23.0",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {

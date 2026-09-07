@@ -44,7 +44,8 @@ const ctx = {
     removeItem: k => { delete store[k]; }
   },
   document: { getElementById: nodo, addEventListener: () => {}, hidden: false, title: '' },
-  io: () => ({ on: () => {}, emit: () => {}, connected: false }),
+  fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+  RT: { suscribir: async () => ({}) },
   setInterval: () => 0, clearInterval: () => {}, setTimeout: () => 0, clearTimeout: () => {}
 };
 ctx.globalThis = ctx;
@@ -142,6 +143,25 @@ chequear('conviven 4 alturas distintas en la misma lista',
   new Set([...html.matchAll(/class="etiq">([^<]*)</g)].map(m => m[1])
     .filter(t => !/^G\d$/.test(t))).size === 4,
   [...new Set([...html.matchAll(/class="etiq">([^<]*)</g)].map(m => m[1]))].join(','));
+
+/* ── el broadcast trae TODAS las pistas del ring, el cliente filtra ────── */
+console.log('\nFiltrado del broadcast por pista');
+// El servidor manda un snapshot por cada pista del ring (lib/realtime.js);
+// sin mirar ninguna en particular (pistaId=null en la URL) sólo importa el de
+// la que sea la activa en este momento.
+const otraPista = {
+  ...guardado.snap, ts: Date.now(),
+  pista: { id: 'm2', nombre: 'Otra Pista', estado: 'pendiente', arrancada: false },
+  esActiva: false, lista: []
+};
+ctx.alRecibirSnapshot(otraPista);
+chequear('un snapshot de una pista que no es la activa se ignora',
+  nodo('pistaNombre').textContent === 'Agility 1', nodo('pistaNombre').textContent);
+
+const actualizado = { ...guardado.snap, ts: Date.now(), pista: { ...guardado.snap.pista, nombre: 'Agility 1 bis' } };
+ctx.alRecibirSnapshot(actualizado);
+chequear('un snapshot de la pista activa sí se aplica',
+  nodo('pistaNombre').textContent === 'Agility 1 bis', nodo('pistaNombre').textContent);
 
 console.log(`\n${'─'.repeat(60)}`);
 console.log(fallos.length ? `${ok} ok, ${fallos.length} FALLAS` : `${ok} de ${ok} pruebas ok`);
