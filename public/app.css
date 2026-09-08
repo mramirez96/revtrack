@@ -160,6 +160,17 @@ body {
 .btn.fantasma { background: transparent; color: var(--turf); box-shadow: inset 0 0 0 1.5px var(--line); }
 .btn.chico { padding: 11px 14px; font-size: 13px; }
 
+/* Reemplaza el contenido de un botón mientras espera al servidor — el color
+   sale de `currentColor`, así que se ve bien en cualquier variante de botón. */
+@keyframes girar { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block; width: 1.1em; height: 1.1em;
+  border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; opacity: .8;
+  animation: girar .6s linear infinite;
+  vertical-align: -0.2em;
+}
+
 /* ── cola ─────────────────────────────────────────────────────────────── */
 .cola { padding: 20px var(--pad) 64px; }
 .cola > .wrap > .eyebrow { color: var(--mist); }
@@ -297,6 +308,8 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 }
 .mesa-btn.peligro { color: #FFB3AA; box-shadow: inset 0 0 0 2px rgba(219,59,43,.6); }
 .mesa-btn[disabled] { opacity: .35; cursor: not-allowed; }
+/* Salvo mientras muestra el spinner: ahí tiene que verse bien, no apagado. */
+.mesa-btn:has(.spinner), .btn:has(.spinner), .iconbtn:has(.spinner), .mesa-link:has(.spinner) { opacity: 1; }
 
 .mesa-fila-chica { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
 .mesa-link {

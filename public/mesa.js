@@ -199,33 +199,34 @@ function render() {
 
   // Los botones de avanzar no existen cuando se está mirando otra pista.
   const btnSig = el('btnSiguiente');
-  if (btnSig) btnSig.onclick = () => accion('siguiente');
+  if (btnSig) btnSig.onclick = () => accion('siguiente', undefined, btnSig);
   const btnAus = el('btnAusente');
   if (btnAus) btnAus.onclick = () => {
     const objetivo = enPista || pendientes[0];
     if (!objetivo) return;
     const quien = `${objetivo.perro} (${objetivo.guia}${objetivo.dorsal ? `, dorsal ${objetivo.dorsal}` : ''})`;
     if (confirm(`¿Marcar ausente a ${quien}?`)) {
-      accion('ausente', { id: objetivo.id });
+      accion('ausente', { id: objetivo.id }, btnAus);
     }
   };
-  el('btnDeshacer').onclick = () => accion('deshacer');
+  const btnDeshacer = el('btnDeshacer');
+  btnDeshacer.onclick = () => accion('deshacer', undefined, btnDeshacer);
 
   const btnVolver = el('btnVolverActiva');
-  if (btnVolver) btnVolver.onclick = () => verPista(null);
+  if (btnVolver) btnVolver.onclick = () => verPista(null, btnVolver);
   const btnAbrir = el('btnAbrirEsta');
   if (btnAbrir) btnAbrir.onclick = () => {
     if (confirm(`¿Abrir ${snap.pista.nombre}? La que está en curso queda en pausa.`)) {
-      accion('abrir_pista', { id: snap.pista.id });
+      accion('abrir_pista', { id: snap.pista.id }, btnAbrir);
       verPista(null);
     }
   };
 
   el('app').querySelectorAll('[data-mover]').forEach(b => {
-    b.onclick = () => accion('mover', { id: b.dataset.mover, delta: Number(b.dataset.delta) });
+    b.onclick = () => accion('mover', { id: b.dataset.mover, delta: Number(b.dataset.delta) }, b);
   });
   el('app').querySelectorAll('[data-ausente]').forEach(b => {
-    b.onclick = () => accion('ausente', { id: b.dataset.ausente });
+    b.onclick = () => accion('ausente', { id: b.dataset.ausente }, b);
   });
   const btnOrden = el('btnOrden');
   if (btnOrden) btnOrden.onclick = () => {
@@ -237,7 +238,7 @@ function render() {
     const invertir = el('ordenInvertir').checked;
     const lector = new FileReader();
     lector.onerror = () => aviso('No pude leer el archivo.', true);
-    lector.onload = () => accion('cargar_orden', { pistaId, csv: String(lector.result), invertir });
+    lector.onload = () => accion('cargar_orden', { pistaId, csv: String(lector.result), invertir }, btnOrden);
     lector.readAsText(archivo, 'utf-8');
   };
 
@@ -253,17 +254,17 @@ function render() {
     }
     const lector = new FileReader();
     lector.onerror = () => aviso('No pude leer el archivo.', true);
-    lector.onload = () => nuevaCompetenciaSubmit(String(lector.result));
+    lector.onload = () => nuevaCompetenciaSubmit(String(lector.result), btnNueva);
     lector.readAsText(archivo, 'utf-8');
   };
 
   // Tocar un chip sólo cambia lo que la mesa está viendo. Abrir una pista —que
   // pausa la que está corriendo— es el botón aparte, con confirmación.
   el('app').querySelectorAll('[data-ver]').forEach(b => {
-    b.onclick = () => verPista(b.dataset.ver);
+    b.onclick = () => verPista(b.dataset.ver, b);
   });
   el('app').querySelectorAll('[data-mpista]').forEach(b => {
-    b.onclick = () => accion('mover_pista', { id: b.dataset.mpista, delta: Number(b.dataset.delta) });
+    b.onclick = () => accion('mover_pista', { id: b.dataset.mpista, delta: Number(b.dataset.delta) }, b);
   });
 
   frescura();
@@ -281,8 +282,9 @@ function renderPin() {
         <button class="btn" id="btnPin" style="background:var(--chalk);color:var(--turf)">Entrar</button>
       </div>
     </section>`;
-  const enviar = () => entrarConPin(el('inPin').value.trim());
-  el('btnPin').onclick = enviar;
+  const btnPin = el('btnPin');
+  const enviar = () => entrarConPin(el('inPin').value.trim(), btnPin);
+  btnPin.onclick = enviar;
   el('inPin').onkeydown = e => { if (e.key === 'Enter') enviar(); };
 }
 
@@ -305,8 +307,9 @@ function tokenVigente(tok) {
   return !!p && p.r === ringId && p.e > Date.now();
 }
 
-async function entrarConPin(pin) {
+async function entrarConPin(pin, btn) {
   if (!pin) return;
+  conCarga(btn, true);
   try {
     const r = await fetch('/api/mesa/entrar', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -320,12 +323,31 @@ async function entrarConPin(pin) {
     render();
   } catch {
     aviso('No pude conectarme al servidor.', true);
+  } finally {
+    conCarga(btn, false);
   }
 }
 
 /* ── acciones + tiempo real ──────────────────────────────────────────── */
 
-async function accion(ruta, body) {
+// El botón muestra un spinner apenas se toca en vez de esperar a que vuelva
+// el servidor — en la nube cada acción es un viaje a Postgres, no la llamada
+// en memoria de antes, y sin esto el toque se sentía como que no pasó nada.
+function conCarga(btn, on) {
+  if (!btn) return;
+  if (on) {
+    btn.dataset.htmlPrevio = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span>';
+  } else if (btn.isConnected) {
+    btn.disabled = false;
+    if (btn.dataset.htmlPrevio !== undefined) btn.innerHTML = btn.dataset.htmlPrevio;
+    delete btn.dataset.htmlPrevio;
+  }
+}
+
+async function accion(ruta, body, btn) {
+  conCarga(btn, true);
   try {
     const r = await fetch(`/api/ring/${encodeURIComponent(ringId)}/${ruta}`, {
       method: 'POST',
@@ -348,10 +370,13 @@ async function accion(ruta, body) {
     if (d.aviso) aviso(d.aviso, false, 14000);
   } catch {
     aviso('No pude conectarme al servidor.', true);
+  } finally {
+    conCarga(btn, false);
   }
 }
 
-async function nuevaCompetenciaSubmit(csv) {
+async function nuevaCompetenciaSubmit(csv, btn) {
+  conCarga(btn, true);
   try {
     const r = await fetch('/api/nueva_competencia', {
       method: 'POST',
@@ -368,12 +393,14 @@ async function nuevaCompetenciaSubmit(csv) {
     location.href = d.ringId ? `/mesa/${encodeURIComponent(d.ringId)}` : '/';
   } catch {
     aviso('No pude conectarme al servidor.', true);
+  } finally {
+    conCarga(btn, false);
   }
 }
 
-function verPista(id) {
+function verPista(id, btn) {
   viendo = id;
-  cargarSnapshot();
+  cargarSnapshot(btn);
 }
 
 // Si el ring de la URL no existe, la pantalla quedaba en "Cargando…" sin
@@ -391,7 +418,8 @@ function ringInexistente() {
     </section>`;
 }
 
-async function cargarSnapshot() {
+async function cargarSnapshot(btn) {
+  conCarga(btn, true);
   try {
     const q = viendo ? `?pista=${encodeURIComponent(viendo)}` : '';
     const r = await fetch(`/api/ring/${encodeURIComponent(ringId)}${q}`);
@@ -401,6 +429,8 @@ async function cargarSnapshot() {
     render();
   } catch {
     aviso('No pude conectarme al servidor.', true);
+  } finally {
+    conCarga(btn, false);
   }
 }
 
@@ -430,6 +460,6 @@ try {
 // Atajos para quien usa la mesa con teclado o pedal.
 document.addEventListener('keydown', e => {
   if (!autorizado || e.target.tagName === 'INPUT') return;
-  if (e.code === 'Space' || e.key === 'ArrowRight') { e.preventDefault(); accion('siguiente'); }
-  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); accion('deshacer'); }
+  if (e.code === 'Space' || e.key === 'ArrowRight') { e.preventDefault(); accion('siguiente', undefined, el('btnSiguiente')); }
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); accion('deshacer', undefined, el('btnDeshacer')); }
 });
