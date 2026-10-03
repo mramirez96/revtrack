@@ -1,7 +1,7 @@
 // Reglas de puntaje y armado de la clasificación. Un solo módulo para los dos
-// lados: el servidor (lib/estado.js, con require() de un módulo ES, estable
-// desde Node 20.19) calcula lo que se difunde, y la mesa (web/) lo importa para
-// mostrar la penalización mientras se tipea, antes de guardar.
+// lados: el servidor (lib/estado.js) calcula lo que se difunde, y la mesa
+// (web/) lo importa para mostrar la penalización mientras se tipea, antes de
+// guardar.
 //
 // Reglas, verificadas contra la planilla de resultados del club (las fórmulas
 // de "PLANILLA PARA RTDOS G2 COMBINADO" y los PDF de los Regionales CEACAN):

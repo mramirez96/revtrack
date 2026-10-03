@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-'use strict';
-
 // Servidor de desarrollo local: lo mismo que vercel.json describe —api/index.js
 // bajo /api y la SPA de React para todo lo demás— en un solo proceso y sin
 // necesitar el CLI de Vercel ni una cuenta. El front lo sirve Vite como
@@ -14,16 +12,16 @@
 //   MESA_SECRET=cualquier-string-largo \
 //     npm run dev
 
-const path = require('path');
-const express = require('express');
-const api = require('../api/index.js');
+import path from 'node:path';
+import express from 'express';
+import { createServer } from 'vite';
+import api from '../api/index.js';
 
 const PORT = process.env.PORT || 3000;
 
 async function main() {
-  const { createServer } = await import('vite');
   const vite = await createServer({
-    configFile: path.join(__dirname, '..', 'vite.config.mjs'),
+    configFile: path.join(import.meta.dirname, '..', 'vite.config.mjs'),
     server: { middlewareMode: true },
     // 'spa': cualquier ruta que no sea un archivo (/ring/x, /mesa/x) devuelve
     // index.html, igual que el rewrite de vercel.json.

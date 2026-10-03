@@ -224,7 +224,7 @@ lib/auth.js           PIN check, rate limit, signed mesa tokens
 lib/realtime.js        publishes snapshots to Supabase Realtime after each action
 supabase/migrations/   the Postgres schema
 scripts/seed.js         load a real event's CSV into Supabase ahead of time
-shared/resultados.mjs  scoring rules — imported by the server (require) and the views
+shared/resultados.mjs  scoring rules — imported by both the server and the views
 web/                   the React app (Vite root)
   src/main.jsx           routes: /, /ring/:id, /mesa/:id
   src/paginas/           Portada (programme), Ring (competitor view), Mesa (table)

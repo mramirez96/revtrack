@@ -1,4 +1,3 @@
-'use strict';
 // Corre las dos suites y devuelve un exit code distinto de 0 si alguna falla.
 // `npm test`.
 //
@@ -9,12 +8,12 @@
 //                            con Vitest + Testing Library sobre jsdom (sin
 //                            navegador)
 
-const { spawnSync } = require('child_process');
-const path = require('path');
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 
-const raiz = path.join(__dirname, '..');
+const raiz = path.join(import.meta.dirname, '..');
 const SUITES = [
-  ['integración', [path.join(__dirname, 'prueba.js')]],
+  ['integración', [path.join(import.meta.dirname, 'prueba.js')]],
   ['interfaz (React)', [path.join(raiz, 'node_modules', 'vitest', 'vitest.mjs'), 'run']]
 ];
 

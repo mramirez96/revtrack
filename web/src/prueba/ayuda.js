@@ -1,11 +1,8 @@
-import { createRequire } from 'node:module';
 import { vi } from 'vitest';
-
 // Los snapshots de prueba los arma el servidor de verdad (lib/estado.js), así
 // las pantallas ven exactamente los campos que llegan por Realtime: res,
 // puesto, podio, clasificacion, trs.
-const require = createRequire(import.meta.url);
-const estado = require('../../../lib/estado.js');
+import * as estado from '../../../lib/estado.js';
 
 export const perro = (n, dorsal, nombre, guia, altura, categoria, est, resultado = null, pistaId = 'p1') =>
   ({ id: `i${n}`, pistaId, orden: n, dorsal, guia, perro: nombre, raza: '', altura, categoria, estado: est, resultado });
