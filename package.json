@@ -3,14 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "RevTrack — orden de salida en vivo para competencias de agility",
-  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
     "dev": "node scripts/dev.js",
     "build": "vite build",
     "test": "node test/run.js",
     "test:web": "vitest run",
-    "reset": "node -e \"const fs=require('fs');for(const f of ['data/state.json','data/state.json.tmp'])fs.rmSync(f,{force:true});console.log('estado borrado, se vuelve a sembrar desde data/seed.csv')\"",
     "seed:supabase": "node scripts/seed.js"
   },
   "dependencies": {
@@ -19,15 +16,12 @@
     "pg": "^8.23.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-router-dom": "^7.18.4",
-    "socket.io": "^4.7.5"
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.7",
     "@vitejs/plugin-react": "^6.1.1",
     "jsdom": "^28.1.0",
-    "socket.io-client": "^4.7.5",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
   },
