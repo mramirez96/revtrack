@@ -382,7 +382,9 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 /* Cargar orden desde archivo */
 .orden-carga { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .orden-carga select,
-.orden-carga input[type="file"] {
+.orden-carga input[type="file"],
+.orden-carga input[type="text"],
+.orden-carga input[type="date"] {
   font: inherit; font-size: 14px;
   color: var(--chalk); background: rgba(244,246,241,.1);
   border: 1px solid rgba(244,246,241,.3); border-radius: var(--r);
@@ -507,3 +509,5 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 body.mesa .clasif-en-mesa .etiq { border-color: var(--line); color: var(--mist); }
 body.mesa .clasif-en-mesa .etiq.calif { color: var(--slate); }
 body.mesa .clasif-en-mesa .etiq.calif.cero { color: var(--chalk); }
+/* El selector de fecha nativo, con su ícono claro sobre el fondo verde. */
+.orden-carga input[type="date"] { color-scheme: dark; }

@@ -5,6 +5,13 @@ import { BotonCarga } from './comunes.jsx';
 // Mismo tope que el servidor: mejor avisar acá que mandar 5 MB al vacío.
 const TOPE = 500000;
 
+// La fecha de hoy en la hora local (toISOString daría la de UTC: de noche en
+// Argentina ya sería mañana).
+const hoy = () => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+
 // Carga el orden de salida de una pista desde un CSV (el que sale del
 // cronometraje de la pista anterior). Sólo para pistas que no arrancaron.
 export function CargarOrden({ snap, accion, mostrar }) {
@@ -56,6 +63,10 @@ export function CargarOrden({ snap, accion, mostrar }) {
 // un confirm() está a un toque de distancia y esto borra el día entero.
 export function NuevaCompetencia({ snap, token, mostrar, corridos }) {
   const [confirmar, setConfirmar] = useState('');
+  // El CSV no trae el nombre del evento ni la fecha: van aparte. Sin nombre,
+  // el servidor usa el de la cancha del archivo.
+  const [nombre, setNombre] = useState('');
+  const [fecha, setFecha] = useState(hoy);
   const archivo = useRef(null);
 
   async function cargar() {
@@ -66,7 +77,7 @@ export function NuevaCompetencia({ snap, token, mostrar, corridos }) {
     let csv;
     try { csv = await f.text(); } catch { return mostrar('No pude leer el archivo.', true); }
     try {
-      const r = await enviar('/api/nueva_competencia', { csv, confirmar: 'BORRAR' }, token);
+      const r = await enviar('/api/nueva_competencia', { csv, confirmar: 'BORRAR', nombre, fecha }, token);
       if (!r.ok) return mostrar(r.datos.error || 'No se pudo cargar la competencia.', true);
       // La mesa se va derecho a la competencia nueva: su URL vieja apunta a un
       // ring que probablemente ya no exista. El reporte cruza la navegación
@@ -88,6 +99,10 @@ export function NuevaCompetencia({ snap, token, mostrar, corridos }) {
           El estado actual queda respaldado en la base, pero desde la app no se puede volver atrás.</p>
         <div className="orden-carga" style={{ marginTop: 12 }}>
           <input ref={archivo} type="file" accept=".csv,text/csv,text/plain" aria-label="CSV de la competencia nueva" />
+          <input type="text" placeholder="Nombre (si no, el de la cancha del archivo)" aria-label="Nombre de la competencia"
+                 style={{ minWidth: 260, fontFamily: 'inherit' }} value={nombre} onChange={e => setNombre(e.target.value)} />
+          <input type="date" aria-label="Fecha de la competencia" style={{ fontFamily: 'inherit' }}
+                 value={fecha} onChange={e => setFecha(e.target.value)} />
           <input type="text" placeholder="escribí BORRAR" aria-label="Escribí BORRAR para confirmar"
                  style={{ width: 150, fontFamily: 'inherit' }} value={confirmar} onChange={e => setConfirmar(e.target.value)} />
           <BotonCarga className="mesa-btn secundario peligro" style={{ fontSize: 16, padding: '12px 18px' }} onClick={cargar}>

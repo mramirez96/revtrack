@@ -580,7 +580,11 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       .concat(['Final,G1,Large,201,Guía A,PERRO A'])
       .concat([',G1,Large,203,Guía C,SIN PISTA', 'Final,G1,Large,204,Guía D,'])
       .join('\n') + '\n';
-    const irA = await nuevaCompetencia(mesaN.token, { csv: csvNueva, confirmar: 'BORRAR' });
+    const fechaMala = await nuevaCompetencia(mesaN.token, { csv: csvNueva, confirmar: 'BORRAR', fecha: '3/10/2026' });
+    chequear('una fecha que no es AAAA-MM-DD se rechaza', /fecha no es válida/.test(String(fechaMala.error)), JSON.stringify(fechaMala));
+    const irA = await nuevaCompetencia(mesaN.token, {
+      csv: csvNueva, confirmar: 'BORRAR', nombre: '  Copa de Otoño ', fecha: '2026-10-04'
+    });
     chequear('reporta lo que cargó', /Competencia nueva cargada/.test(String(irA.aviso)), String(irA.aviso));
     chequear('cuenta las filas salteadas sin pista o sin perro', /2 fila\(s\) salteada/.test(String(irA.aviso)), String(irA.aviso));
     // Sin esto la mesa recarga su URL vieja, que apunta a un ring que ya no existe.
@@ -590,6 +594,15 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     chequear('la competencia vieja desapareció',
       resN.rings.length === 1 && resN.rings[0].id !== 'ring-1', JSON.stringify(resN.rings.map(r => r.id)));
     chequear('sin columna "ring", la cancha toma el nombre del evento', resN.rings[0].nombre === 'Copa de Otoño', resN.rings[0].nombre);
+    chequear('el nombre y la fecha que puso la mesa quedan en el evento',
+      resN.evento.nombre === 'Copa de Otoño' && resN.evento.fecha === '2026-10-04', JSON.stringify(resN.evento));
+    // Sin nombre: el evento se llama como la (única) cancha del archivo, no
+    // con un nombre por defecto que nadie eligió.
+    chequear('sin nombre, el evento toma el de la cancha del archivo',
+      dominio.sembrar(['ring,pista,perro', '3era Regional ABA,Agility 1 G1,LUCKY'].join('\n'))
+        .state.evento.nombre === '3era Regional ABA');
+    chequear('sin nombre ni cancha, queda "Competencia"',
+      dominio.sembrar(['pista,perro', 'Agility 1,LUCKY'].join('\n')).state.evento.nombre === 'Competencia');
     chequear('cargó las 2 pistas nuevas',
       resN.rings[0].pistas.map(p => p.nombre).join(',') === 'Agility 1,Final',
       resN.rings[0].pistas.map(p => p.nombre).join(','));
