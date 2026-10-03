@@ -1,4 +1,3 @@
-'use strict';
 // Prueba de integración: levanta el servidor real (api/index.js) contra un
 // esquema de Postgres exclusivo de esta corrida — nunca toca el proyecto de
 // Supabase de producción, ni el de otra corrida concurrente.
@@ -24,10 +23,12 @@
 //     que apuntar. Lo que sí se prueba (más abajo) es el equivalente real:
 //     con la base vacía, se siembra sola desde data/seed.example.csv.
 
-const path = require('path');
-const http = require('http');
-const dominio = require('../lib/dominio');
-const Resultados = require('../public/resultados');
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import pg from 'pg';
+import * as dominio from '../lib/dominio.js';
+import * as Resultados from '../shared/resultados.mjs';
 
 const DB_BASE = process.env.TEST_DATABASE_URL || process.env.SUPABASE_DB_URL;
 if (!DB_BASE) {
@@ -47,9 +48,11 @@ process.env.MESA_SECRET = 'secreto-de-prueba';
 delete process.env.EVENTO;
 delete process.env.FECHA;
 
-const { Pool } = require('pg');
-const db = require('../lib/db');
-const app = require('../api/index.js');
+// Import dinámico, y recién acá: lib/db.js abre el pool (y lib/auth.js lee
+// MESA_SECRET) al cargarse, así que tienen que ver el entorno de arriba.
+const { Pool } = pg;
+const db = await import('../lib/db.js');
+const { default: app } = await import('../api/index.js');
 
 const PIN = process.env.MESA_PIN;
 let PUERTO = 3400 + (process.pid % 500);
@@ -87,8 +90,7 @@ async function crearEsquema() {
   await admin.query(`create schema if not exists "${ESQUEMA}"`);
   await admin.end();
   // Todas las migraciones, en orden, igual que en un proyecto real.
-  const fs = require('fs');
-  const dir = path.join(__dirname, '..', 'supabase', 'migrations');
+  const dir = path.join(import.meta.dirname, '..', 'supabase', 'migrations');
   for (const archivo of fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort()) {
     await db.pool.query(fs.readFileSync(path.join(dir, archivo), 'utf8'));
   }

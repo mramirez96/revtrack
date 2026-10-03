@@ -1,8 +1,13 @@
-// Cachea el shell para que la vista abra aunque el campo no tenga señal. Los
-// datos en vivo van por Supabase Realtime; el último estado conocido lo
-// guarda live.js en localStorage.
-const CACHE = 'revtrack-v3';
-const SHELL = ['/', '/ring.html', '/app.css', '/live.js', '/resultados.js', '/rt.js', '/manifest.webmanifest', '/icono.svg'];
+// Cachea la app para que la vista abra aunque el campo no tenga señal. Los
+// datos en vivo van por Supabase Realtime; el último estado conocido lo guarda
+// la propia vista en localStorage.
+//
+// Con Vite los archivos de la app llevan un hash en el nombre y cambian en
+// cada deploy, así que no hay una lista fija que precargar: se guarda lo que se
+// va pidiendo (red primero, caché si no hay red) y, para cualquier ruta de la
+// SPA sin red, se devuelve el index.html cacheado.
+const CACHE = 'revtrack-v4';
+const SHELL = ['/', '/manifest.webmanifest', '/icono.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -26,6 +31,6 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, copia));
         return res;
       })
-      .catch(() => caches.match(e.request).then(r => r || caches.match('/ring.html')))
+      .catch(() => caches.match(e.request).then(r => r || (e.request.mode === 'navigate' ? caches.match('/') : undefined)))
   );
 });

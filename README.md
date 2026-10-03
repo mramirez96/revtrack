@@ -18,20 +18,15 @@ without speaking it.
 
 ## Architecture
 
-RevTrack runs on **Vercel + Supabase**, at zero cost: Vercel serves the static
-front end and a serverless function under `/api/*`; Supabase holds the state in
-Postgres and pushes live updates to every phone over Realtime Broadcast. There is
-no long-running process and no volume to mount — the previous single-process
-Node + Socket.io + `data/state.json` design (still in `server.js`, still
-deployable to Fly.io) is kept only as a fallback until the new path is proven in
-production; see [Deploy](#deploy) below for why, and the *Decisions* section
-further down for the reasoning behind each piece of the new design.
+RevTrack runs on **Vercel + Supabase**, at zero cost: Vercel serves the front end —
+a React single-page app built with Vite — and a serverless function under `/api/*`;
+Supabase holds the state in Postgres and pushes live updates to every phone over
+Realtime Broadcast. There is no long-running process and no volume to mount. See the
+*Decisions* section further down for the reasoning behind each piece.
 
 ## Run it
 
-There is no build step: the front end is plain HTML and JavaScript.
-
-**Locally, against the new stack:**
+**Locally:**
 
 ```bash
 npm install
@@ -42,8 +37,10 @@ SUPABASE_DB_URL=<from `supabase status`> \
 SUPABASE_URL=<from `supabase status`> \
 SUPABASE_ANON_KEY=<from `supabase status`> \
 MESA_SECRET=<any long random string>    \
-  vercel dev
+  npm run dev                           # API + React (Vite, hot reload) on :3000
 ```
+
+`npm run build` produces `dist/`, which is what Vercel serves; it runs on every deploy.
 
 With no data loaded yet, the first request seeds from `data/seed.example.csv`
 (invented data) so a fresh clone works immediately. To load a real event ahead of
@@ -61,9 +58,9 @@ The table is behind a PIN (`1234` by default, `MESA_PIN=xxxx` to change it).
 TEST_DATABASE_URL=postgres://postgres:postgres@localhost:54322/postgres npm test
 ```
 
-189+ assertions across 5 suites — the integration suite needs a throwaway Postgres
-(the local `supabase start` one works, or any disposable container) and creates its
-own schema inside it, so it never touches real data.
+Two suites: integration (needs a throwaway Postgres — the local `supabase start`
+one works, or any disposable container — and creates its own schema inside it, so it
+never touches real data) and the React views (`npm run test:web` runs only those).
 
 ## The problem it solves
 
@@ -111,7 +108,7 @@ own table and its own running round, isolated from the other.
 The table types, for each dog that ran: **time, faults, refusals** (*negativas* in the UI — the club's word), or *Eliminado*.
 Only those raw inputs are stored (`inscripciones.resultado`); penalties and placings
 are computed on read, so correcting a TRS mid-round re-scores everyone without
-re-entering anything. The rules live in one file, `public/resultados.js`, shared by
+re-entering anything. The rules live in one file, `shared/resultados.mjs`, shared by
 the server (which broadcasts the computed results) and the table (which previews the
 penalty while typing). These rules were checked against the club's own result
 sheets (the spreadsheet's formulas and past regional results); `test/prueba.js` replays
@@ -211,7 +208,7 @@ at once no longer means last-write-wins.
 publishes a snapshot for every course in that ring to one Supabase Realtime channel
 (`lib/realtime.js`) — not a message routed per viewer, because there's no persistent
 connection left to route from. Each phone already knows which course it's looking at
-and ignores the rest (`alRecibirSnapshot` in `live.js`/`mesa.js`); the same guarantee
+and ignores the rest (the `snapshot` handler in `web/src/paginas/Ring.jsx`/`Mesa.jsx`); the same guarantee
 as before — a change in Ring 2 never touches what a Ring 1 phone shows — just enforced
 on the other end of the wire.
 
@@ -221,21 +218,21 @@ on the other end of the wire.
 api/index.js        the Express app behind /api/* — routes only, no business logic
 lib/dominio.js       pure functions: CSV parsing, height ordering, sembrar()
 lib/estado.js        queries + actions (siguiente, mover, deshacer…) — same shape
-                      as the old server.js, operating on a `state` passed in
+                      as the original single-process server, operating on a `state` passed in
 lib/db.js             Postgres: load/save the whole state, per-ring undo, the lock
 lib/auth.js           PIN check, rate limit, signed mesa tokens
 lib/realtime.js        publishes snapshots to Supabase Realtime after each action
 supabase/migrations/   the Postgres schema
 scripts/seed.js         load a real event's CSV into Supabase ahead of time
-public/index.html    programme
-public/ring.html     competitor view  + live.js
-public/mesa.html     table control    + mesa.js
-public/rt.js          tiny Supabase Realtime subscription helper, shared by all three
-public/app.css        all three views
-public/sw.js           shell cache, so the page opens with no signal
+shared/resultados.mjs  scoring rules — imported by both the server and the views
+web/                   the React app (Vite root)
+  src/main.jsx           routes: /, /ring/:id, /mesa/:id
+  src/paginas/           Portada (programme), Ring (competitor view), Mesa (table)
+  src/componentes/       shared bits + the table's result editor, TRS, file loads
+  src/lib/realtime.js    useCanal(): Supabase Realtime subscription as a hook
+  src/app.css            all three views
+  public/sw.js           caches the app, so the page opens with no signal
 test/run.js            npm test
-server.js, fly.toml,   the previous single-process deploy — kept as a fallback,
-Dockerfile              see Deploy below
 ```
 
 Reading path: `dominio.sembrar()` shows the whole model, `estado.snapshot()` shows
@@ -244,37 +241,33 @@ everything the views can possibly render, `estado.siguiente()` is the core actio
 
 ## Deploy
 
-**Primary: Vercel + Supabase, at zero cost.**
+**Vercel + Supabase, at zero cost.**
 
-1. Create a Supabase project, run `supabase/migrations/0001_init.sql` against it
-   (SQL editor, or `psql "$SUPABASE_DB_URL" -f supabase/migrations/0001_init.sql`).
+1. Create a Supabase project and apply `supabase/migrations/` (`supabase link` +
+   `supabase db push`, or paste each file into the SQL editor, in order).
 2. On Vercel, import the repo and set: `SUPABASE_DB_URL` (the pooled connection
    string, Transaction mode), `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
    `SUPABASE_SERVICE_ROLE_KEY`, `MESA_PIN`, `MESA_SECRET` (any long random string —
    signs the mesa session token, distinct from `MESA_PIN`).
-3. Deploy. The first request auto-seeds from `data/seed.example.csv`; load the real
+3. Deploy (`vercel.json` runs `npm run build` and serves `dist/`). The first request auto-seeds from `data/seed.example.csv`; load the real
    event beforehand with `SUPABASE_DB_URL=... npm run seed:supabase data/seed.csv`.
 
 No volume, no always-on process, nothing to patch — Vercel and Supabase's free tiers
 cover a club running a few events a year comfortably.
 
-**Fallback: Fly.io**, via `server.js` + `fly.toml` + `Dockerfile` — the original
-single-process design, kept deployable until the Vercel path has run a real event.
-Needs a persistent volume (see the comments in `fly.toml`) for `data/state.json` to
-survive deploys and restarts. Once the new path is proven, these three files —
-and `data/seed.csv`'s role as the on-disk seed — go away.
-
 ## Tests
 
-189+ assertions, no browser and no test framework:
+No browser needed:
 
 - **Integration** (`test/prueba.js`) boots the real `api/index.js` against a
   throwaway Postgres schema and exercises every action and every guard —
   permissions, PIN lockout, cross-course isolation, per-course undo, CSV quoting,
   order imports, competition reload, survival across a server restart.
-- **View suites** run `live.js` and `mesa.js` inside `node:vm` against a minimal DOM,
-  which is enough to assert what actually gets rendered — including that a
-  broadcast for a course you're not looking at gets ignored.
+- **Views** (`web/src/**/*.test.jsx`) render the React pages with Vitest + Testing
+  Library on jsdom, with snapshots built by the real `lib/estado.js` — including that
+  a broadcast for a course you're not looking at gets ignored, that what the table is
+  typing survives an incoming update, and that saving a result jumps to the next dog
+  and rolls back if the server refuses.
 
 The integration suite creates its own Postgres schema, named after the process id, and
 drops it when it's done — it never touches real data, and two runs in parallel don't
@@ -291,7 +284,7 @@ Postgres — `supabase start` locally, or any throwaway container.
   order for a round that depends on the previous round's results is still imported
   from a file.
 - **"Live" depends on Supabase Realtime's connection state**, not a server heartbeat
-  (the old design had one; see the note in `public/live.js`). A dropped websocket
+  (the old single-process design had one). A dropped websocket
   reads as "sin señal" almost immediately, same as before — just measured differently.
 
 ---

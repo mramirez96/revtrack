@@ -1,5 +1,3 @@
-'use strict';
-
 // La app Express que atiende /api/*. Mismo rol que la sección "http" de
 // server.js, pero sin `http.createServer` ni socket.io: cada pedido es una
 // invocación de función serverless independiente, así que el estado se carga
@@ -9,11 +7,11 @@
 // a `{ error }` con 400; el éxito es `{}` o `{ aviso }` — mismo criterio que
 // el `accion()` de server.js, adaptado de eventos de socket a respuestas HTTP.
 
-const express = require('express');
-const db = require('../lib/db');
-const estado = require('../lib/estado');
-const realtime = require('../lib/realtime');
-const auth = require('../lib/auth');
+import express from 'express';
+import * as db from '../lib/db.js';
+import * as estado from '../lib/estado.js';
+import * as realtime from '../lib/realtime.js';
+import * as auth from '../lib/auth.js';
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -159,4 +157,4 @@ app.use((err, _req, res, _next) => {
   res.status(400).json({ error: 'Pedido inválido.' });
 });
 
-module.exports = app;
+export default app;

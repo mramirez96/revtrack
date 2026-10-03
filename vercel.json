@@ -1,12 +1,13 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/ring/:ringId", "destination": "/ring.html" },
-    { "source": "/mesa/:ringId", "destination": "/mesa.html" },
-    { "source": "/api/:path*", "destination": "/api/index.js" }
+    { "source": "/api/:path*", "destination": "/api/index.js" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "data/seed.example.csv"
+      "includeFiles": "{data/seed.example.csv,shared/resultados.mjs}"
     }
   }
 }

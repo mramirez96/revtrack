@@ -1,16 +1,8 @@
 node_modules/
 
-# Copias del proyecto que crean los tests. Se borran al terminar, pero una corrida
-# interrumpida las deja tiradas y no tienen que llegar al repo.
-test/sandbox*/
-
 # La lista de inscripciones de un evento real: nombres de personas. Nunca al repo.
 # Se versiona sólo data/seed.example.csv, con datos inventados.
 data/seed.csv
 
-# Estado vivo del evento: se genera solo desde el CSV
-data/state.json
-data/state.json.tmp
-data/state.json.roto-*
-data/state.json.incompatible-*
-data/state.json.anterior-*
+# Build del front (vite build): lo genera Vercel en cada deploy.
+dist/

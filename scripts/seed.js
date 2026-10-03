@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-'use strict';
-
 // Carga (o reemplaza) la competencia en Supabase desde un CSV — para preparar
 // un evento real antes del día de la competencia, sin pasar por la mesa.
 // Equivalente a poner el archivo en data/seed.csv y correr `npm run reset` en
@@ -8,9 +6,9 @@
 //
 // Uso: SUPABASE_DB_URL=postgres://... node scripts/seed.js data/seed.csv
 
-const fs = require('fs');
-const dominio = require('../lib/dominio');
-const db = require('../lib/db');
+import fs from 'node:fs';
+import * as dominio from '../lib/dominio.js';
+import * as db from '../lib/db.js';
 
 async function main() {
   const archivo = process.argv[2];
