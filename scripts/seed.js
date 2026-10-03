@@ -17,7 +17,8 @@ async function main() {
     process.exit(1);
   }
   const csv = fs.readFileSync(archivo, 'utf8');
-  const nombreEvento = process.env.EVENTO || 'Copa de Otoño';
+  // Sin EVENTO, el evento se llama como la cancha del archivo (dominio.sembrar).
+  const nombreEvento = process.env.EVENTO;
   const fecha = process.env.FECHA;
   const { state, saltadas } = dominio.sembrar(csv, { nombreEvento, fecha });
   if (!state.pistas.length || !state.inscripciones.length) {

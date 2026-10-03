@@ -6,9 +6,10 @@ import { guardado } from '../lib/formato.js';
 import {
   Aviso, BotonCarga, Dorsal, Etiquetas, RingInexistente, Tope, useAviso
 } from '../componentes/comunes.jsx';
-import EditorResultado from '../componentes/EditorResultado.jsx';
+import { CorregirResultados, EnPistaMesa, useResultados } from '../componentes/ResultadosMesa.jsx';
 import TrsPista from '../componentes/TrsPista.jsx';
 import { CargarOrden, NuevaCompetencia } from '../componentes/ArchivosMesa.jsx';
+import Clasificacion from '../componentes/Clasificacion.jsx';
 
 /* ── token de mesa ───────────────────────────────────────────────────── */
 
@@ -162,7 +163,6 @@ function Pin({ ring, ringId, mostrar, alEntrar }) {
 
 function Panel({ snap, ringId, token, accion, mostrar, setViendo }) {
   const lista = snap.lista;
-  const enPista = lista.find(i => i.estado === 'en_pista');
   const pendientes = lista.filter(i => i.estado === 'pendiente');
   const corridos = lista.filter(i => i.estado === 'corrido').length;
   // Mirando una pista que no es la que corre: se muestran las herramientas de
@@ -171,12 +171,8 @@ function Panel({ snap, ringId, token, accion, mostrar, setViendo }) {
   // equivocada sin darse cuenta.
   const otra = !snap.esActiva;
 
-  const marcarAusente = async () => {
-    const o = enPista || pendientes[0];
-    if (!o) return;
-    const quien = `${o.perro} (${o.guia}${o.dorsal ? `, dorsal ${o.dorsal}` : ''})`;
-    if (confirm(`¿Marcar ausente a ${quien}?`)) await accion('ausente', { id: o.id });
-  };
+  const res = useResultados(accion, mostrar);
+
   const abrirEsta = async () => {
     if (!confirm(`¿Abrir ${snap.pista.nombre}? La que está en curso queda en pausa.`)) return;
     if (await accion('abrir_pista', { id: snap.pista.id })) setViendo(null);
@@ -195,31 +191,9 @@ function Panel({ snap, ringId, token, accion, mostrar, setViendo }) {
       </div>
     )}
 
-    <section className="mesa-actual">
-      <p className="eyebrow">{otra ? snap.pista?.nombre : 'En pista'}</p>
-      {enPista ? (
-        <div className="mesa-actual-fila">
-          <Dorsal i={enPista} />
-          <span><span className="mesa-actual-nombre">{enPista.perro}</span><br />
-            <span className="mesa-actual-sub">{enPista.guia}<Etiquetas i={enPista} /></span></span>
-        </div>
-      ) : (
-        <p className="mesa-actual-nombre" style={{ marginTop: 6 }}>
-          {otra && !snap.pista?.arrancada ? 'Todavía no arrancó' : pendientes.length ? 'Nadie en pista' : 'Pista terminada'}
-        </p>
-      )}
-    </section>
-
-    {!otra && (
-      <div className="mesa-botones">
-        <BotonCarga className="mesa-btn" disabled={!pendientes.length && !enPista} onClick={() => accion('siguiente')}>
-          {enPista ? 'Siguiente' : 'Largar el primero'}
-        </BotonCarga>
-        <BotonCarga className="mesa-btn secundario peligro" disabled={!enPista && !pendientes.length} onClick={marcarAusente}>
-          Marcar ausente
-        </BotonCarga>
-      </div>
-    )}
+    {/* Lo que la mesa hace el 90% del tiempo, todo junto arriba: el perro en
+        pista, su tiempo, y largar el siguiente. */}
+    <EnPistaMesa key={`en-pista:${snap.pista?.id}`} snap={snap} res={res} accion={accion} />
 
     <div className="mesa-fila-chica">
       <BotonCarga className="mesa-link" onClick={() => accion('deshacer')}>Deshacer lo último</BotonCarga>
@@ -228,7 +202,9 @@ function Panel({ snap, ringId, token, accion, mostrar, setViendo }) {
       </span>
     </div>
 
-    <EditorResultado key={snap.pista?.id} snap={snap} accion={accion} mostrar={mostrar} />
+    <CorregirResultados key={`resultados:${snap.pista?.id}`} snap={snap} res={res} />
+
+    <ClasificacionMesa snap={snap} />
 
     <section className="mesa-seccion">
       <p className="eyebrow">{otra ? 'Orden de salida' : 'Próximos'}</p>
@@ -241,8 +217,6 @@ function Panel({ snap, ringId, token, accion, mostrar, setViendo }) {
                         onClick={() => accion('mover', { id: i.id, delta: -1 })}>↑</BotonCarga>
             <BotonCarga className="iconbtn" aria-label={`Bajar a ${i.perro}`} disabled={n === pendientes.length - 1}
                         onClick={() => accion('mover', { id: i.id, delta: 1 })}>↓</BotonCarga>
-            <BotonCarga className="iconbtn" aria-label={`Marcar ausente a ${i.perro}`}
-                        onClick={() => accion('ausente', { id: i.id })}>✕</BotonCarga>
           </li>
         ))}
         {!pendientes.length && <li className="mesa-item"><span className="mesa-item-quien">No queda nadie pendiente.</span></li>}
@@ -295,6 +269,25 @@ function Programa({ snap, accion, setViendo }) {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+// La misma clasificación que ven los corredores, para chequearla desde la
+// mesa. Plegada por defecto: no es lo que se mira a cada rato.
+function ClasificacionMesa({ snap }) {
+  const [ver, setVer] = useState(false);
+  if (!snap.pista?.arrancada) return null;
+  const n = (snap.clasificacion || []).reduce((a, p) => a + p.filas.length, 0);
+  return (
+    <section className="mesa-seccion">
+      <div className="mesa-seccion-tope">
+        <p className="eyebrow">Clasificación · {snap.pista.nombre}</p>
+        <button className="mesa-link" onClick={() => setVer(!ver)}>
+          {ver ? 'Ocultar' : `Ver (${n} con resultado)`}
+        </button>
+      </div>
+      {ver && <div className="clasif-en-mesa"><Clasificacion snap={snap} /></div>}
     </section>
   );
 }
