@@ -27,6 +27,7 @@
 const path = require('path');
 const http = require('http');
 const dominio = require('../lib/dominio');
+const Resultados = require('../public/resultados');
 
 const DB_BASE = process.env.TEST_DATABASE_URL || process.env.SUPABASE_DB_URL;
 if (!DB_BASE) {
@@ -85,9 +86,12 @@ async function crearEsquema() {
   const admin = new Pool({ connectionString: DB_BASE, max: 1 });
   await admin.query(`create schema if not exists "${ESQUEMA}"`);
   await admin.end();
-  const migracion = require('fs').readFileSync(
-    path.join(__dirname, '..', 'supabase', 'migrations', '0001_init.sql'), 'utf8');
-  await db.pool.query(migracion);
+  // Todas las migraciones, en orden, igual que en un proyecto real.
+  const fs = require('fs');
+  const dir = path.join(__dirname, '..', 'supabase', 'migrations');
+  for (const archivo of fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort()) {
+    await db.pool.query(fs.readFileSync(path.join(dir, archivo), 'utf8'));
+  }
 }
 async function borrarEsquema() {
   const admin = new Pool({ connectionString: DB_BASE, max: 1 });
@@ -627,6 +631,155 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     chequear('el ring con campos entrecomillados existe', !!ring3 && !ring3.error, JSON.stringify(ring3).slice(0, 80));
     chequear('la coma dentro de comillas no parte la columna', ring3?.lista?.[0]?.guia === 'Ruiz, Marta', JSON.stringify(ring3?.lista?.[0]));
     chequear('la raza entrecomillada también', ring3?.lista?.[0]?.raza === 'Border Collie, tricolor', ring3?.lista?.[0]?.raza);
+
+    /* ── 7a. alturas con el nombre que usa el club ───────────────────── */
+    console.log('\n7a. Mini / Midi / Intermediate/Large');
+    {
+      // Como vienen en el orden de salida de un regional: Mini y Midi, y en G0
+      // Intermediate/Large en un solo bloque. Desordenado a propósito.
+      const { state } = dominio.sembrar(['ring,pista,categoria,altura,dorsal,guia,perro',
+        'R,G0,G0,Intermediate/Large,,Ana,TITI', 'R,G0,G0,Midi,,Bea,CHINA',
+        'R,G0,G0,XS,,Caro,VAINILLA', 'R,G0,G0,Mini,,Dani,TIAGO'].join('\n'));
+      const orden = state.inscripciones.sort((a, b) => a.orden - b.orden).map(i => i.altura).join(',');
+      chequear('Mini y Midi se ordenan como Small y Medium, no al final',
+        orden === 'XS,Mini,Midi,Intermediate/Large', orden);
+      const grupos = ['Mini', 'Midi', 'Intermediate/Large'].map(a => Resultados.grupoDeAltura(a).nombre).join(',');
+      chequear('y caen en sus podios de siempre', grupos === 'Small/Midi,Small/Midi,Intermediate/Large', grupos);
+    }
+
+    /* ── 7b. resultados: tiempo, faltas, rehúses, TRS y clasificación ──── */
+    console.log('\n7b. Resultados y clasificación');
+    await sembrarFixture(FIXTURE);
+    // Orden sembrado: 45 XS G2, 42 Small G2, 44 Medium G1, 46 Intermediate G3,
+    // 41 Large G1, 43 Large G3. Podios: Small/Midi junta XS/Small/Medium;
+    // Intermediate/Large junta esas dos; cada uno abierto por grado.
+    const mesaRes = await entrar('ring-1', PIN);
+    const PISTA = 'ring-1--jumping-1';
+    const idDe = (snap, dorsal) => snap.lista.find(i => i.dorsal === dorsal).id;
+    const de = (snap, dorsal) => snap.lista.find(i => i.dorsal === dorsal);
+    let rs = (await accion('ring-1', 'siguiente', mesaRes.token)).snap;   // 45 a pista
+
+    const sinToken = await accion('ring-1', 'resultado', null, { id: idDe(rs, '45'), tiempo: 30 });
+    chequear('sin token de mesa no se carga un resultado', !!sinToken.error, JSON.stringify(sinToken));
+    const noCorrio = await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '42'), tiempo: 30 });
+    chequear('a un perro que no corrió no se le carga resultado',
+      /todavía no corrió/.test(String(noCorrio.error)), JSON.stringify(noCorrio));
+    const sinTiempo = await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '45'), faltas: 1 });
+    chequear('sin tiempo (y sin eliminar) se rechaza', /Falta el tiempo/.test(String(sinTiempo.error)), JSON.stringify(sinTiempo));
+    const tiempoMalo = await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '45'), tiempo: 'abc' });
+    chequear('un tiempo que no es número se rechaza', /no es un número/.test(String(tiempoMalo.error)), JSON.stringify(tiempoMalo));
+    const faltasMalas = await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '45'), tiempo: 30, faltas: 1.5 });
+    chequear('faltas no enteras se rechazan', /faltas/.test(String(faltasMalas.error)), JSON.stringify(faltasMalas));
+
+    // Se le carga resultado al que está en pista, con coma decimal como en el teclado.
+    rs = (await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '45'), tiempo: '38,52', faltas: 1 })).snap;
+    chequear('el que está en pista ya puede tener resultado; la coma decimal se entiende',
+      de(rs, '45').resultado?.tiempo === 38.52 && de(rs, '45').res?.total === 5,
+      JSON.stringify(de(rs, '45')));
+    chequear('XS cae en el podio Small/Midi de su grado', de(rs, '45').podio === 'Small/Midi G2', de(rs, '45').podio);
+    chequear('con un solo resultado es 1º', de(rs, '45').puesto === 1, String(de(rs, '45').puesto));
+
+    rs = (await accion('ring-1', 'siguiente', mesaRes.token)).snap;   // 45 corrido, 42 a pista
+    rs = (await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '42'), tiempo: 40 })).snap;
+    chequear('Small y XS comparten podio: el limpio le gana al de 1 falta aunque sea más lento',
+      de(rs, '42').puesto === 1 && de(rs, '45').puesto === 2,
+      JSON.stringify([de(rs, '42').puesto, de(rs, '45').puesto]));
+    chequear('sin TRS no hay faltas de tiempo, y se avisa', de(rs, '42').res.exceso === 0 && de(rs, '42').res.sinTrs === true,
+      JSON.stringify(de(rs, '42').res));
+
+    // TRS: uno solo por pista, el mismo para todos los que la corren.
+    const trsMalo = await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, trs: 'cuarenta' });
+    chequear('un TRS que no es número se rechaza', /no es un número/.test(String(trsMalo.error)), JSON.stringify(trsMalo));
+    const sinVel = await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, largo: 191 });
+    chequear('largo sin velocidad se rechaza', /hace falta la velocidad/.test(String(sinVel.error)), JSON.stringify(sinVel));
+    const trsAjeno = await accion('ring-1', 'trs', mesaRes.token, { pistaId: 'ring-2--agility-1', trs: 39 });
+    chequear('no se le carga TRS a una pista de otro ring', !!trsAjeno.error, JSON.stringify(trsAjeno));
+
+    rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, trs: '39' })).snap;
+    chequear('con TRS 39, 40 s suma 1 punto de tiempo', de(rs, '42').res.exceso === 1 && de(rs, '42').res.total === 1,
+      JSON.stringify(de(rs, '42').res));
+    chequear('el exceso se calcula con centésimas',
+      Resultados.calcular({ tiempo: 41.48, faltas: 0, rehuses: 0 }, { trs: 39 }).total === 2.48);
+    const open = Resultados.clasificar([
+      { id: 'g1', altura: 'Large', categoria: 'G1', estado: 'corrido', resultado: { tiempo: 42, faltas: 0, rehuses: 0 } },
+      { id: 'g2', altura: 'Large', categoria: 'G2', estado: 'corrido', resultado: { tiempo: 42, faltas: 0, rehuses: 0 } }
+    ], { trs: 40 });
+    chequear('en un open, G1 y G2 usan el mismo TRS (cada uno en su podio)',
+      open.length === 2 && open.every(p => p.filas[0].res.exceso === 2), JSON.stringify(open.map(p => [p.nombre, p.filas[0].res.exceso])));
+
+    rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, largo: '191', velocidad: '4,5' })).snap;
+    chequear('con largo y velocidad, el TRS sale de dividir (191 m ÷ 4,5 m/s = 42,44 s)',
+      Math.abs(rs.trs.trs - 42.444444) < 1e-5 && rs.trs.largo === 191 && rs.trs.velocidad === 4.5,
+      JSON.stringify(rs.trs));
+    chequear('y 38,52 s queda dentro: sólo cuenta la falta', de(rs, '45').res.total === 5 && de(rs, '45').res.calif === 'Exc',
+      JSON.stringify(de(rs, '45').res));
+    rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, trs: '39' })).snap;
+
+    // Filas reales de las planillas del club: la app tiene que dar lo mismo.
+    const fila = (tiempo, faltas, rehuses, trs) => Resultados.calcular({ tiempo, faltas, rehuses, eliminado: false }, { trs });
+    const trsReg3 = Resultados.trsDe(191, 4.5);   // Regional 3, G2 Agility: 191 m a 4,5 m/s
+    const nuit = fila(37.81, 0, 0, trsReg3);
+    chequear('planilla: Nuit, limpia en 37,81 → 0,00 Cero Exc', nuit.total === 0 && nuit.calif === 'Cero Exc', JSON.stringify(nuit));
+    const aluen = fila(39.5, 1, 1, trsReg3);
+    chequear('planilla: Aluen, "fn" en 39,5 → 10,00 MB', aluen.total === 10 && aluen.calif === 'MB', JSON.stringify(aluen));
+    const awka = fila(54.41, 2, 2, trsReg3);
+    chequear('planilla: Awka, "nfnf" en 54,41 → 31,97 No clasifica',
+      Resultados.fmt(awka.total) === '31,97' && awka.calif === 'No clasifica', JSON.stringify(awka));
+    const qoyai = fila(49.82, 0, 0, 49.37);
+    chequear('planilla: Qoyai, limpia pero 0,45 s sobre el TRS → 0,45 Exc (no es cero)',
+      qoyai.total === 0.45 && qoyai.calif === 'Exc', JSON.stringify(qoyai));
+    const ordenReg4 = Resultados.clasificar([
+      { id: 'z', altura: 'Large', categoria: 'G2', estado: 'corrido', resultado: { tiempo: 38.72, faltas: 1, rehuses: 0 } },
+      { id: 'q', altura: 'Large', categoria: 'G2', estado: 'corrido', resultado: { tiempo: 49.82, faltas: 0, rehuses: 0 } }
+    ], { trs: 49.37 })[0].filas.map(f => f.id).join(',');
+    chequear('planilla Regional 4: Qoyai (0,45) queda arriba de Zamba (1 falta, 11 s más rápida)', ordenReg4 === 'q,z', ordenReg4);
+    chequear('cortes de calificación de la planilla',
+      ['Exc', 'MB', 'MB', 'B', 'B', 'No clasifica'].join() ===
+      [5.99, 6, 15.99, 16, 25.99, 26].map(Resultados.calificacion).join(),
+      [5.99, 6, 15.99, 16, 25.99, 26].map(Resultados.calificacion).join());
+
+    // Sin TMR: pasarse mucho del TRS no elimina, sólo suma.
+    rs = (await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '42'), tiempo: 99 })).snap;
+    chequear('pasarse mucho del TRS suma los segundos, no elimina (no hay TMR)',
+      de(rs, '42').res.eliminado === false && de(rs, '42').res.total === 60, JSON.stringify(de(rs, '42').res));
+    chequear('y el de 1 falta en tiempo le gana', de(rs, '45').puesto === 1 && de(rs, '42').puesto === 2,
+      JSON.stringify([de(rs, '45').puesto, de(rs, '42').puesto]));
+    rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, trs: '' })).snap;
+    chequear('vaciar el TRS lo saca', !rs.trs.trs && de(rs, '42').res.exceso === 0,
+      JSON.stringify(rs.trs));
+
+    rs = (await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '42'), tiempo: 40, rehuses: 3 })).snap;
+    chequear('la tercera negativa elimina', de(rs, '42').res.eliminado && /3 negativas/.test(de(rs, '42').res.motivo),
+      JSON.stringify(de(rs, '42').res));
+    rs = (await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '42'), eliminado: true })).snap;
+    chequear('un eliminado puede no tener tiempo', de(rs, '42').res.eliminado && de(rs, '42').resultado.tiempo === null,
+      JSON.stringify(de(rs, '42').resultado));
+
+    rs = (await accion('ring-1', 'deshacer', mesaRes.token)).snap;
+    chequear('deshacer vuelve al resultado anterior', de(rs, '42').resultado.rehuses === 3, JSON.stringify(de(rs, '42').resultado));
+    rs = (await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '42'), borrar: true })).snap;
+    chequear('borrar el resultado lo saca de la clasificación',
+      de(rs, '42').resultado === null && de(rs, '42').puesto === undefined, JSON.stringify(de(rs, '42')));
+
+    const nombres = rs.clasificacion.map(p => p.nombre).join(' / ');
+    chequear('podios en orden: Small/Midi antes que Intermediate/Large, y por grado',
+      nombres === 'Small/Midi G1 / Small/Midi G2 / Intermediate/Large G1 / Intermediate/Large G3', nombres);
+    const smG2 = rs.clasificacion.find(p => p.nombre === 'Small/Midi G2');
+    chequear('el podio cuenta los que faltan cargar (clasificación provisoria)',
+      smG2.clasificados === 1 && smG2.faltan === 1, JSON.stringify(smG2));
+
+    // Un perro de otro ring, y un ausente.
+    const ajenoRes = (await snapshot('ring-2')).lista[0].id;
+    const cruceRes = await accion('ring-1', 'resultado', mesaRes.token, { id: ajenoRes, tiempo: 30 });
+    chequear('no se carga resultado a un perro de otro ring', !!cruceRes.error, JSON.stringify(cruceRes));
+    rs = (await accion('ring-1', 'ausente', mesaRes.token, { id: idDe(rs, '44') })).snap;
+    const alAusente = await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '44'), tiempo: 30 });
+    chequear('a un ausente no se le carga resultado', /ausente/.test(String(alAusente.error)), JSON.stringify(alAusente));
+
+    // Persistido en Postgres, no sólo en el snapshot de la respuesta.
+    await reiniciarServidor();
+    rs = await snapshot('ring-1');
+    chequear('el resultado sobrevive al reinicio', de(rs, '45').resultado?.tiempo === 38.52, JSON.stringify(de(rs, '45').resultado));
 
     /* ── 8. bloqueo de PIN ─────────────────────────────────────────────── */
     console.log('\n8. Fuerza bruta del PIN');

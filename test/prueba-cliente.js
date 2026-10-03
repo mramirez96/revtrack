@@ -4,7 +4,9 @@
 
 const fs = require('fs');
 const vm = require('vm');
-const src = fs.readFileSync(process.argv[2] || require('path').join(__dirname, '..', 'public', 'live.js'), 'utf8');
+// Como en el navegador: resultados.js se carga antes, en el mismo global.
+const src = fs.readFileSync(require('path').join(__dirname, '..', 'public', 'resultados.js'), 'utf8') + '\n' +
+  fs.readFileSync(process.argv[2] || require('path').join(__dirname, '..', 'public', 'live.js'), 'utf8');
 
 const guardado = {
   snap: {
@@ -162,6 +164,42 @@ const actualizado = { ...guardado.snap, ts: Date.now(), pista: { ...guardado.sna
 ctx.alRecibirSnapshot(actualizado);
 chequear('un snapshot de la pista activa sí se aplica',
   nodo('pistaNombre').textContent === 'Agility 1 bis', nodo('pistaNombre').textContent);
+
+/* ── resultados y clasificación ────────────────────────────────────────── */
+console.log('\nResultados y clasificación');
+{
+  // Armado por el servidor de verdad, para ver los mismos campos que llegan.
+  const estado = require('../lib/estado');
+  const base = guardado.snap;
+  const resDe = { '41': { tiempo: 38.2, faltas: 0, rehuses: 0, eliminado: false } };
+  const conRes = estado.snapshot({
+    evento: base.evento, rings: [base.ring],
+    pistas: [{ id: base.pista.id, ringId: base.ring.id, nombre: 'Agility 1', orden: 1, estado: 'en_curso',
+      segPerro: 35, marcas: [], trs: {} }],
+    inscripciones: base.lista.map(i => ({ ...i, pistaId: base.pista.id, resultado: resDe[i.dorsal] || null }))
+  }, base.ring.id);
+  chequear('el snapshot de prueba es de la pista activa', conRes.esActiva === true);
+  ctx.alRecibirSnapshot(conRes);
+
+  const cola = nodo('cola').innerHTML;
+  const trozo41 = (cola.split('<span class="dorsal">41</span>')[1] || '').split('</li>')[0];
+  chequear('el que corrió muestra su penalización y su tiempo en vez de "corrió"',
+    /<b>0,00<\/b>/.test(trozo41) && /38,20 s/.test(trozo41), trozo41.slice(-160));
+  chequear('aparecen las pestañas de orden y clasificación', /id="tabClasif"/.test(nodo('vistaTabs').innerHTML));
+  chequear('arranca mostrando el orden de salida', nodo('cola').hidden === false && nodo('clasif').hidden === true);
+
+  nodo('tabClasif').onclick();
+  const clasif = nodo('clasif').innerHTML;
+  chequear('la pestaña muestra la clasificación', nodo('clasif').hidden === false && nodo('cola').hidden === true);
+  chequear('cada podio con su nombre (Large va con Intermediate)', /Intermediate\/Large G1/.test(clasif),
+    clasif.match(/podio-tit">[^<]*/g)?.join(' | '));
+  chequear('el podio sin resultados no aparece vacío', !/Small\/Midi G2/.test(clasif));
+  chequear('sin TRS cargado se aclara', /sin TRS/.test(clasif));
+  chequear('la clasificación muestra la calificación (limpio = Cero Exc, destacado)',
+    /etiq calif cero">Cero Exc</.test(clasif), clasif.match(/etiq calif[^<]*/)?.[0]);
+  chequear('la elección de pestaña se recuerda', store.vista === 'clasif', String(store.vista));
+  nodo('tabOrden').onclick();
+}
 
 console.log(`\n${'─'.repeat(60)}`);
 console.log(fallos.length ? `${ok} ok, ${fallos.length} FALLAS` : `${ok} de ${ok} pruebas ok`);

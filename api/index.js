@@ -117,6 +117,12 @@ app.post('/api/ring/:ringId/mover_pista', auth.requiereMesa, accionRing(
 app.post('/api/ring/:ringId/cargar_orden', auth.requiereMesa, accionRing(
   (state, undo, req) => estado.cargarOrden(state, undo, req.params.ringId, req.body)));
 
+app.post('/api/ring/:ringId/resultado', auth.requiereMesa, accionRing(
+  (state, undo, req) => estado.cargarResultado(state, undo, req.params.ringId, req.body)));
+
+app.post('/api/ring/:ringId/trs', auth.requiereMesa, accionRing(
+  (state, undo, req) => estado.fijarTrs(state, undo, req.params.ringId, req.body)));
+
 app.post('/api/ring/:ringId/deshacer', auth.requiereMesa, accionRing(
   (state, undo) => estado.deshacer(state, undo)));
 

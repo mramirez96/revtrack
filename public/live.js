@@ -99,6 +99,7 @@ function render() {
 
   renderTurno(lista, pendientes);
   renderCola(lista, pendientes);
+  renderVista();
   frescura();
 }
 
@@ -167,7 +168,9 @@ function renderTurno(lista, pendientes) {
   } else if (mio.estado !== 'pendiente') {
     seccion.className = 'turno ya';
     cont.innerHTML = `<p class="eyebrow">Tu turno</p>
-      <p class="cuenta-txt" style="margin-top:6px">${mio.estado === 'ausente' ? 'Figurás como ausente en esta pista.' : 'Ya corriste esta pista.'}</p>${cambiar}`;
+      ${mio.estado === 'ausente'
+        ? '<p class="cuenta-txt" style="margin-top:6px">Figurás como ausente en esta pista.</p>'
+        : miResultado(mio)}${cambiar}`;
   } else if (!snap.pista?.arrancada) {
     // La pista no largó todavía: la hora estimada sería inventada, porque no se
     // sabe cuándo arranca. Se dice la posición, que sí es un dato firme.
@@ -256,11 +259,97 @@ function renderCola(lista, pendientes) {
         <span class="cola-nombre">${esc(i.perro)}</span><br>
         <span class="cola-sub">${esc(i.guia)}${etiquetas(i)}</span>
       </span>
-      <span class="cola-eta mono">${marca
-        ? marca.nota
-        : snap.pista?.arrancada ? reloj(idx * snap.segPerro) : `${idx + 1}º`}</span>
+      ${i.res
+        ? resCola(i.res)
+        : `<span class="cola-eta mono">${marca
+            ? marca.nota
+            : snap.pista?.arrancada ? reloj(idx * snap.segPerro) : `${idx + 1}º`}</span>`}
     </li>`;
   }).join('');
+}
+
+/* ── resultados ──────────────────────────────────────────────────────── */
+
+const fmt = Resultados.fmt;
+
+// Penalización arriba, tiempo abajo: lo primero es lo que ordena el podio.
+function resCola(res) {
+  return `<span class="cola-eta cola-res mono">${res.eliminado
+    ? '<b>E</b>'
+    : `<b>${fmt(res.total)}</b>`}<br><span class="cola-res-t">${
+      res.tiempo !== null ? `${fmt(res.tiempo)} s` : ''}</span></span>`;
+}
+
+function miResultado(mio) {
+  if (!mio.res) {
+    return `<p class="cuenta-txt" style="margin-top:6px">Ya corriste esta pista.</p>
+      <p class="cuenta-sub">Tu resultado todavía no está cargado.</p>`;
+  }
+  const podio = (snap.clasificacion || []).find(p => p.filas.some(f => f.id === mio.id));
+  const provisorio = podio && podio.faltan
+    ? ` Provisorio: ${podio.faltan === 1 ? 'falta 1' : `faltan ${podio.faltan}`} por correr en tu podio.` : '';
+  return `
+    <div class="cuenta">
+      <span class="dorsal cuenta-n">${mio.puesto ? `${mio.puesto}º` : 'E'}</span>
+      <span class="cuenta-txt">${mio.puesto
+        ? `de ${podio.clasificados} en ${esc(mio.podio)}`
+        : `Eliminado en ${esc(mio.podio)}`}
+        <br><span class="cuenta-sub">${esc(Resultados.resumenCorto(mio.res))} · ${esc(Resultados.desglose(mio.res))}</span>
+      </span>
+    </div>
+    ${provisorio ? `<p class="cuenta-sub">${provisorio.trim()}</p>` : ''}`;
+}
+
+// Orden de salida o clasificación. La pestaña sólo aparece cuando hay algún
+// resultado: antes, "Clasificación" sería una pantalla vacía.
+let vista = 'orden';
+try { vista = localStorage.getItem('vista') === 'clasif' ? 'clasif' : 'orden'; } catch { /* sin storage */ }
+
+function renderVista() {
+  const hay = (snap.clasificacion || []).some(p => p.filas.length);
+  const enClasif = hay && vista === 'clasif';
+  el('vistaTabs').innerHTML = hay ? `
+    <button class="tab ${enClasif ? '' : 'activa'}" id="tabOrden">Orden de salida</button>
+    <button class="tab ${enClasif ? 'activa' : ''}" id="tabClasif">Clasificación</button>` : '';
+  el('colaTitulo').hidden = hay;
+  el('cola').hidden = enClasif;
+  el('clasif').hidden = !enClasif;
+  if (enClasif) renderClasif();
+  if (!hay) return;
+  const elegir = v => () => {
+    vista = v;
+    try { localStorage.setItem('vista', v); } catch { /* sin storage */ }
+    renderVista();
+  };
+  el('tabOrden').onclick = elegir('orden');
+  el('tabClasif').onclick = elegir('clasif');
+}
+
+// "TRS 42,44 s · 191 m a 4,5 m/s": de dónde salió, para quien quiera hacer la cuenta.
+function trsTexto(r) {
+  if (!r?.trs) return 'sin TRS';
+  const libre = n => n.toLocaleString('es-AR', { maximumFractionDigits: 2 });
+  return `TRS ${fmt(r.trs)} s${r.largo ? ` · ${libre(r.largo)} m a ${libre(r.velocidad)} m/s` : ''}`;
+}
+
+function renderClasif() {
+  // Un solo TRS para toda la pista: se dice una vez, arriba de los podios.
+  el('clasif').innerHTML = `<p class="clasif-trs mono">${trsTexto(snap.trs)}</p>` +
+    snap.clasificacion.filter(p => p.filas.length).map(p => `
+    <div class="podio">
+      <p class="podio-tit">${esc(p.nombre)}</p>
+      <ol class="cola-lista">${p.filas.map(f => `
+        <li class="cola-item ${esMio(f) ? 'vos' : ''} ${f.res.eliminado ? 'eliminado' : ''}">
+          <span class="dorsal puesto">${f.puesto ?? 'E'}</span>
+          <span class="cola-quien">
+            <span class="cola-nombre">${esc(f.perro)}</span><br>
+            <span class="cola-sub">${f.dorsal ? `${esc(f.dorsal)} · ` : ''}${esc(f.guia)}${etiquetas(f)}
+              <span class="etiq calif ${f.res.calif === 'Cero Exc' ? 'cero' : ''}">${esc(f.res.calif)}</span></span>
+          </span>
+          ${resCola(f.res)}
+        </li>`).join('')}</ol>
+      ${p.faltan ? `<p class="podio-nota">Provisoria · ${p.faltan} por correr</p>` : ''}
+    </div>`).join('');
 }
 
 function guardarClave() {
@@ -339,6 +428,8 @@ async function cargarSnapshot() {
     const q = pistaId ? `?pista=${encodeURIComponent(pistaId)}` : '';
     const r = await fetch(`/api/ring/${encodeURIComponent(ringId)}${q}`);
     if (r.status === 404) return ringInexistente();
+    // Un 500 trae { error }, no un snapshot: pisar el estado con eso rompía la pantalla.
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     snap = await r.json();
     recibidoEn = Date.now();
     guardarCache();
