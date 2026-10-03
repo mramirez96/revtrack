@@ -5,7 +5,9 @@
 
 const fs = require('fs');
 const vm = require('vm');
-const src = fs.readFileSync(require('path').join(__dirname, '..', 'public', 'live.js'), 'utf8');
+// Como en el navegador: resultados.js se carga antes, en el mismo global.
+const src = fs.readFileSync(require('path').join(__dirname, '..', 'public', 'resultados.js'), 'utf8') + '\n' +
+  fs.readFileSync(require('path').join(__dirname, '..', 'public', 'live.js'), 'utf8');
 
 const perro = (n, dorsal, nombre, guia, altura, cat, estado) =>
   ({ id: `i${n}`, dorsal, perro: nombre, guia, raza: '', altura, categoria: cat, estado });

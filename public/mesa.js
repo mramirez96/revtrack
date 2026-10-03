@@ -26,6 +26,21 @@ let recibidoEn = 0;
 // "en vivo" ahora se lee directo de acá y no de un heartbeat de servidor.
 let conectado = false;
 
+// Resultado que se está cargando: a qué perro (null = el que propone la mesa,
+// el último que corrió sin resultado) y lo tipeado hasta ahora. Vive acá y no
+// sólo en el input porque cada snapshot que llega repinta la pantalla entera,
+// y lo que se estaba tipeando no se puede perder.
+let editando = null;
+let borrador = null;
+// Lo tipeado en el TRS de cada pista, hasta que se guarda.
+const trsBorrador = {};
+// La lista de resultados ya cargados se muestra corta salvo que se pida entera.
+let todosCargados = false;
+// Resultados que se mandaron y todavía no volvieron. Mientras tanto se los
+// trata como cargados, así la mesa salta al próximo perro sin esperar al
+// servidor (y un snapshot que llegue en el medio no la hace volver atrás).
+const guardando = new Set();
+
 /* ── avisos ──────────────────────────────────────────────────────────── */
 let avisoTimer = null;
 function aviso(msg, esError, ms = 3500) {
@@ -66,6 +81,25 @@ function render() {
   // pista en curso, y tenerlo a mano acá es la forma segura de largar la pista
   // equivocada sin darse cuenta.
   const otra = !snap.esActiva;
+
+  // A quién se le carga el resultado: el que eligió la mesa o, si no eligió,
+  // el último que corrió sin resultado (el que acaba de salir de la pista), y
+  // si no hay, el que está en pista.
+  const corrieron = lista.filter(i => i.estado === 'corrido' || i.estado === 'en_pista');
+  const sinResultado = corrieron.filter(i => !i.resultado && !guardando.has(i.id));
+  const objetivo = (editando && corrieron.find(i => i.id === editando))
+    || sinResultado.filter(i => i.estado === 'corrido').pop()
+    || sinResultado.find(i => i.estado === 'en_pista')
+    || null;
+  if (!objetivo) borrador = null;
+  else if (!borrador || borrador.id !== objetivo.id) borrador = borradorDe(objetivo);
+
+  // Repintar con innerHTML le saca el foco al input en el que se está
+  // tipeando (llega un snapshot de otra mesa a mitad del tiempo): se anota y
+  // se devuelve.
+  const activo = document.activeElement;
+  const foco = activo && activo.id
+    ? { id: activo.id, ini: activo.selectionStart, fin: activo.selectionEnd } : null;
 
   el('app').innerHTML = `
     ${otra ? `
@@ -108,6 +142,8 @@ function render() {
       </span>
     </div>
 
+    ${seccionResultado(objetivo, sinResultado, corrieron.filter(i => i.resultado))}
+
     <section class="mesa-seccion">
       <p class="eyebrow">${otra ? 'Orden de salida' : 'Próximos'}</p>
       <ul class="mesa-lista">${
@@ -121,6 +157,8 @@ function render() {
           </li>`).join('') || '<li class="mesa-item"><span class="mesa-item-quien">No queda nadie pendiente.</span></li>'
       }</ul>
     </section>
+
+    ${seccionTrs()}
 
     <section class="mesa-seccion">
       <p class="eyebrow">Programa · pistas de la competencia</p>
@@ -267,7 +305,257 @@ function render() {
     b.onclick = () => accion('mover_pista', { id: b.dataset.mpista, delta: Number(b.dataset.delta) }, b);
   });
 
+  conectarResultado(objetivo);
+  conectarTrs();
+
+  if (foco) {
+    const n = el(foco.id);
+    if (n && n.focus) {
+      n.focus();
+      try { n.setSelectionRange(foco.ini, foco.fin); } catch { /* no es un input de texto */ }
+    }
+  }
+
   frescura();
+}
+
+/* ── resultados ──────────────────────────────────────────────────────── */
+
+const fmt = Resultados.fmt;
+
+function borradorDe(i) {
+  const r = i.resultado;
+  return {
+    id: i.id,
+    tiempo: r && r.tiempo !== null ? fmt(r.tiempo) : '',
+    faltas: r ? r.faltas : 0,
+    rehuses: r ? r.rehuses : 0,
+    eliminado: r ? r.eliminado : false
+  };
+}
+
+const nombrePodio = i => i.podio || Resultados.podioDe(i).nombre;
+
+// La penalización de lo que está tipeado, antes de guardar: mismo cálculo que
+// el servidor (public/resultados.js), así lo que se ve es lo que va a quedar.
+function vistaPrevia() {
+  const t = Resultados.leerNumero(borrador.tiempo);
+  if (!borrador.eliminado && t === null) {
+    return borrador.tiempo.trim() ? 'El tiempo no es un número.' : 'Falta el tiempo.';
+  }
+  const regla = snap.trs;
+  const calc = Resultados.calcular({
+    tiempo: t, faltas: borrador.faltas, rehuses: borrador.rehuses, eliminado: borrador.eliminado
+  }, regla);
+  if (calc.eliminado) return `→ ${Resultados.desglose(calc)} · No clasifica`;
+  return `→ ${fmt(calc.total)} pen. · ${calc.calif} · ${Resultados.desglose(calc)} · ${
+    regla ? `TRS ${fmt(regla.trs)} s` : 'sin TRS cargado'}`;
+}
+
+const contador = (campo, nombre) => `
+  <div class="res-campo"><span>${nombre}</span>
+    <div class="res-cont">
+      <button class="iconbtn" data-cont="${campo}" data-d="-1" aria-label="Restar ${nombre.toLowerCase()}"
+              ${borrador[campo] ? '' : 'disabled'}>−</button>
+      <b class="mono">${borrador[campo]}</b>
+      <button class="iconbtn" data-cont="${campo}" data-d="1" aria-label="Sumar ${nombre.toLowerCase()}">+</button>
+    </div>
+  </div>`;
+
+function seccionResultado(objetivo, sinResultado, cargados) {
+  if (!snap.pista?.arrancada) return '';
+  const otrosSin = sinResultado.filter(i => i.id !== objetivo?.id);
+  // Los más recientes primero: lo que se corrige suele ser lo último cargado.
+  const recientes = [...cargados].reverse();
+  const visibles = todosCargados ? recientes : recientes.slice(0, 5);
+  return `
+    <section class="mesa-seccion">
+      <p class="eyebrow">Resultado${sinResultado.length ? ` · faltan cargar ${sinResultado.length}` : ''}</p>
+      ${objetivo ? `
+        <div class="res-editor">
+          <div class="mesa-actual-fila">
+            ${dorsalDe(objetivo)}
+            <span><span class="mesa-item-quien">${esc(objetivo.perro)}</span><br>
+            <span class="mesa-item-sub">${esc(objetivo.guia)}${etiquetas(objetivo)} · ${esc(nombrePodio(objetivo))}${
+              objetivo.estado === 'en_pista' ? ' · en pista' : ''}</span></span>
+          </div>
+          <div class="res-campos">
+            <label class="res-campo"><span>Tiempo (s)</span>
+              <input id="resTiempo" type="text" inputmode="decimal" autocomplete="off" placeholder="38,52"
+                     value="${esc(borrador.tiempo)}"></label>
+            ${contador('faltas', 'Faltas')}
+            ${contador('rehuses', 'Negativas')}
+          </div>
+          <label class="orden-check"><input type="checkbox" id="resElim" ${borrador.eliminado ? 'checked' : ''}> Eliminado</label>
+          <p class="res-previa mono" id="resPrevia">${esc(vistaPrevia())}</p>
+          <div class="res-btns">
+            <button class="btn" id="btnResGuardar" style="background:var(--chalk);color:var(--turf)">Guardar resultado</button>
+            ${objetivo.resultado ? '<button class="mesa-link" id="btnResBorrar">Borrar resultado</button>' : ''}
+            ${editando ? '<button class="mesa-link" id="btnResCancelar">Cancelar</button>' : ''}
+          </div>
+        </div>`
+      : `<p class="mesa-actual-sub" style="margin-top:8px">Todos los que corrieron tienen su resultado.</p>`}
+      ${otrosSin.length ? `
+        <p class="mesa-actual-sub" style="margin:14px 0 0">También ${otrosSin.length === 1 ? 'falta' : 'faltan'}:</p>
+        <div class="mesa-pistas">${otrosSin.map(i =>
+          `<button class="chip" data-editar="${i.id}">${esc(i.dorsal || i.perro)}</button>`).join('')}</div>` : ''}
+      ${recientes.length ? `
+        <p class="mesa-actual-sub" style="margin:14px 0 0">Cargados · tocá uno para corregirlo</p>
+        <ul class="mesa-lista">${visibles.map(i => `
+          <li class="mesa-item ${i.id === objetivo?.id ? 'viendo' : ''}">
+            ${dorsalDe(i)}
+            <button class="mesa-pista-sel" data-editar="${i.id}">${esc(i.perro)}
+              <span class="mesa-item-sub">${esc(Resultados.resumenCorto(i.res))}${
+                i.puesto ? ` · ${i.puesto}º en ${esc(i.podio)}` : ''}</span>
+            </button>
+          </li>`).join('')}</ul>
+        ${recientes.length > 5 ? `<button class="mesa-link" id="btnTodosCargados">${
+          todosCargados ? 'Ver sólo los últimos' : `Ver los ${recientes.length}`}</button>` : ''}` : ''}
+    </section>`;
+}
+
+function conectarResultado(objetivo) {
+  el('app').querySelectorAll('[data-editar]').forEach(b => {
+    b.onclick = () => { editando = b.dataset.editar; borrador = null; render(); };
+  });
+  const btnTodos = el('btnTodosCargados');
+  if (btnTodos) btnTodos.onclick = () => { todosCargados = !todosCargados; render(); };
+  if (!objetivo) return;
+
+  const inT = el('resTiempo');
+  if (inT) {
+    // Tipear no repinta: sólo actualiza la vista previa, así no se pierde el cursor.
+    inT.oninput = () => { borrador.tiempo = inT.value; el('resPrevia').textContent = vistaPrevia(); };
+    inT.onkeydown = e => { if (e.key === 'Enter') guardarResultado(objetivo, el('btnResGuardar')); };
+  }
+  el('app').querySelectorAll('[data-cont]').forEach(b => {
+    b.onclick = () => {
+      const campo = b.dataset.cont;
+      borrador[campo] = Math.max(0, borrador[campo] + Number(b.dataset.d));
+      render();
+    };
+  });
+  const elim = el('resElim');
+  if (elim) elim.onchange = () => { borrador.eliminado = elim.checked; render(); };
+  const btnG = el('btnResGuardar');
+  if (btnG) btnG.onclick = () => guardarResultado(objetivo, btnG);
+  const btnB = el('btnResBorrar');
+  if (btnB) btnB.onclick = () => {
+    if (confirm(`¿Borrar el resultado de ${objetivo.perro}?`)) guardarResultado(objetivo, btnB, true);
+  };
+  const btnC = el('btnResCancelar');
+  if (btnC) btnC.onclick = () => { editando = null; borrador = null; render(); };
+}
+
+async function guardarResultado(i, btn, borrar) {
+  if (borrar) {
+    if (!(await accion('resultado', { id: i.id, borrar: true }, btn))) return;
+    editando = null;
+    borrador = null;
+    aviso(`Resultado de ${i.perro} borrado.`);
+    return cargarSnapshot();
+  }
+
+  // Lo que el servidor va a rechazar seguro se frena acá, antes de saltar:
+  // si no, la mesa pasaría al próximo perro y tendría que volver.
+  if (!borrador.eliminado && Resultados.leerNumero(borrador.tiempo) === null) {
+    return aviso(borrador.tiempo.trim() ? 'El tiempo no es un número.' : 'Falta el tiempo.', true);
+  }
+
+  // Salta ya al próximo perro y guarda en segundo plano. Si el servidor dice
+  // que no, vuelve a este perro con lo que se había tipeado.
+  const tipeado = borrador;
+  const body = { id: i.id, tiempo: tipeado.tiempo, faltas: tipeado.faltas, rehuses: tipeado.rehuses, eliminado: tipeado.eliminado };
+  guardando.add(i.id);
+  editando = null;
+  borrador = null;
+  render();
+  const inT = el('resTiempo');
+  if (inT && inT.focus) inT.focus();   // listo para tipear el tiempo del siguiente
+
+  const ok = await accion('resultado', body);
+  if (!ok) {
+    guardando.delete(i.id);
+    editando = i.id;
+    borrador = tipeado;
+    render();
+    return;
+  }
+  aviso(`Guardado: ${i.perro}.`, false, 1800);
+  await cargarSnapshot();
+  guardando.delete(i.id);
+}
+
+/* ── TRS ─────────────────────────────────────────────────────────────── */
+
+// Largo y velocidad sin ceros de relleno: "191" y "4,5", como en la planilla.
+const fmtLibre = n => n.toLocaleString('es-AR', { maximumFractionDigits: 2 });
+
+function valorTrs() {
+  if (trsBorrador[snap.pista.id]) return trsBorrador[snap.pista.id];
+  const r = snap.trs;
+  return {
+    largo: r?.largo ? fmtLibre(r.largo) : '',
+    velocidad: r?.velocidad ? fmtLibre(r.velocidad) : '',
+    trs: r?.trs ? fmt(r.trs) : ''
+  };
+}
+
+// Con largo y velocidad, el TRS sale de la cuenta y no se tipea; sin ellos,
+// se puede cargar directo.
+function trsCalculado(v) {
+  return Resultados.trsDe(Resultados.leerNumero(v.largo), Resultados.leerNumero(v.velocidad));
+}
+
+function seccionTrs() {
+  if (!snap.pista || !snap.lista.length) return '';
+  const v = valorTrs();
+  const calc = trsCalculado(v);
+  const campo = (c, nombre, unidad, valor, extra = '') => `
+    <label>${nombre} <input id="trs-${c}" data-trs="${c}" type="text"
+           inputmode="decimal" autocomplete="off" placeholder="—" value="${esc(valor)}" ${extra}> ${unidad}</label>`;
+  return `
+    <section class="mesa-seccion">
+      <p class="eyebrow">TRS · ${esc(snap.pista.nombre)}</p>
+      <p class="mesa-actual-sub" style="margin:8px 0 6px">
+        Uno para toda la pista: largo del recorrido ÷ velocidad, como en la planilla.
+        Si ya tenés el TRS calculado, dejá largo y velocidad vacíos y cargalo directo.
+        Cada segundo por encima del TRS suma un punto.
+      </p>
+      <div class="trs-fila">
+        ${campo('largo', 'Largo', 'm', v.largo)}
+        ${campo('velocidad', 'Velocidad', 'm/s', v.velocidad)}
+        ${campo('trs', 'TRS', 's', calc ? fmt(calc) : v.trs, calc ? 'disabled' : '')}
+        <button class="btn chico" id="btnTrsGuardar" style="background:var(--chalk);color:var(--turf)">Guardar</button>
+      </div>
+    </section>`;
+}
+
+function conectarTrs() {
+  el('app').querySelectorAll('[data-trs]').forEach(inp => {
+    inp.oninput = () => {
+      const v = { ...valorTrs(), [inp.dataset.trs]: inp.value };
+      trsBorrador[snap.pista.id] = v;
+      // El TRS se recalcula mientras se tipea, sin repintar (no perder el cursor).
+      const inTrs = el('trs-trs');
+      const calc = trsCalculado(v);
+      if (inTrs && inp !== inTrs) {
+        inTrs.disabled = !!calc;
+        inTrs.value = calc ? fmt(calc) : v.trs;
+      }
+    };
+  });
+  const b = el('btnTrsGuardar');
+  if (b) b.onclick = async () => {
+    const v = valorTrs();
+    const body = { pistaId: snap.pista.id, largo: v.largo, velocidad: v.velocidad };
+    // Con largo y velocidad manda la cuenta; el TRS tipeado sólo cuenta sin ellos.
+    if (!v.largo && !v.velocidad) body.trs = v.trs;
+    if (!(await accion('trs', body, b))) return;
+    delete trsBorrador[snap.pista.id];
+    aviso(v.trs || v.largo ? 'TRS guardado. Los resultados se recalcularon.' : 'TRS borrado.');
+    cargarSnapshot();
+  };
 }
 
 function renderPin() {
@@ -368,6 +656,7 @@ async function accion(ruta, body, btn) {
     // El reporte de "cargar orden" tiene varias partes y hay que poder leerlo;
     // el snapshot actualizado llega solo, por el canal de Realtime.
     if (d.aviso) aviso(d.aviso, false, 14000);
+    return true;
   } catch {
     aviso('No pude conectarme al servidor.', true);
   } finally {
@@ -424,6 +713,8 @@ async function cargarSnapshot(btn) {
     const q = viendo ? `?pista=${encodeURIComponent(viendo)}` : '';
     const r = await fetch(`/api/ring/${encodeURIComponent(ringId)}${q}`);
     if (r.status === 404) return ringInexistente();
+    // Un 500 trae { error }, no un snapshot: pisar el estado con eso rompía la pantalla.
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     snap = await r.json();
     recibidoEn = Date.now();
     render();

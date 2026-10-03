@@ -1,8 +1,8 @@
 // Cachea el shell para que la vista abra aunque el campo no tenga señal. Los
 // datos en vivo van por Supabase Realtime; el último estado conocido lo
 // guarda live.js en localStorage.
-const CACHE = 'revtrack-v2';
-const SHELL = ['/', '/ring.html', '/app.css', '/live.js', '/rt.js', '/manifest.webmanifest', '/icono.svg'];
+const CACHE = 'revtrack-v3';
+const SHELL = ['/', '/ring.html', '/app.css', '/live.js', '/resultados.js', '/rt.js', '/manifest.webmanifest', '/icono.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

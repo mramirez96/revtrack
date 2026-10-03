@@ -85,8 +85,8 @@ Four flat collections in `state`, related by id:
 ```
 evento          { nombre, fecha }
 rings[]         { id, nombre }                    the physical course
-pistas[]        { id, ringId, nombre, orden, estado, segPerro }
-inscripciones[] { id, pistaId, orden, dorsal, guia, perro, altura, categoria, estado }
+pistas[]        { id, ringId, nombre, orden, estado, segPerro, trs }
+inscripciones[] { id, pistaId, orden, dorsal, guia, perro, altura, categoria, estado, resultado }
 marcas{}        pistaId -> [timestamps]           used to measure real pace
 ```
 
@@ -105,6 +105,37 @@ inscripción:  pendiente → en_pista → corrido
 competition (the normal case) doesn't need the column. It only matters when two
 rounds run *simultaneously* on separate courses, in which case each course gets its
 own table and its own running round, isolated from the other.
+
+## Results
+
+The table types, for each dog that ran: **time, faults, refusals** (*negativas* in the UI — the club's word), or *Eliminado*.
+Only those raw inputs are stored (`inscripciones.resultado`); penalties and placings
+are computed on read, so correcting a TRS mid-round re-scores everyone without
+re-entering anything. The rules live in one file, `public/resultados.js`, shared by
+the server (which broadcasts the computed results) and the table (which previews the
+penalty while typing). These rules were checked against the club's own result
+sheets (the spreadsheet's formulas and past regional results); `test/prueba.js` replays
+real rows from them:
+
+- 5 points per fault and per refusal; 1 point per second (hundredths count) over the
+  **TRS**, added to the total — which is also why going over the TRS costs a clean
+  run its *cero*. The third refusal eliminates. There is no TMR (maximum time): the
+  club does not use one.
+- TRS = course length ÷ speed (191 m ÷ 4.5 m/s = 42.44 s), **one per round**: the
+  same number for every dog running it, even in an open where G1 and G2 run
+  together. It can also be typed in directly.
+- Ranked by total penalty, then time. Exact ties share a placing.
+- Grading, same cut-offs as the club's spreadsheet: 0 *Cero Exc*, ≤5.99 *Exc*,
+  ≤15.99 *MB*, ≤25.99 *B*, otherwise *No clasifica*.
+- **Podiums merge heights**, as this club awards them: XS, Small and Midi share one;
+  Intermediate and Large share another. Each is split by grade (G0 included), so the
+  podiums read *Small/Midi G1*, *Intermediate/Large G2*…
+- Entering results never blocks *Siguiente*: dogs that ran without one show up as
+  "faltan cargar" and every result stays editable (and undoable).
+
+Competitors see each dog's penalty and time in the running order, their own placing
+under *Tu turno*, and a *Clasificación* tab (marked provisional while dogs are still
+to run).
 
 ## Loading a competition
 
@@ -255,9 +286,10 @@ Postgres — `supabase start` locally, or any throwaway container.
 - **The PIN is a PIN**, not authentication. The mesa session token it hands out lives
   in `localStorage` on the phone. Enough to stop a curious bystander from advancing
   the order.
-- **No timing or scoring.** No times, faults, eliminations or results — deliberately.
-  Starting order is the problem this solves; the order for a round that depends on the
-  previous round's results is imported from a file instead.
+- **Results are typed, not timed.** The table enters each dog's time, faults and
+  refusals by hand (see *Results* above); there is no link to an electronic timer. The
+  order for a round that depends on the previous round's results is still imported
+  from a file.
 - **"Live" depends on Supabase Realtime's connection state**, not a server heartbeat
   (the old design had one; see the note in `public/live.js`). A dropped websocket
   reads as "sin señal" almost immediately, same as before — just measured differently.
