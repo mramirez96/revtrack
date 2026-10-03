@@ -13,9 +13,9 @@ const PISTAS = [
   { id: 'p3', nombre: 'Agility 1', estado: 'pendiente' }
 ];
 const base = (resultadoRocky = null) => [
-  perro(1, '976', 'ROCKY', 'Gastón Cossano', 'XS', 'G1', 'corrido', resultadoRocky),
-  perro(2, '941', 'FURIA', 'Cristian Pace', 'Small', 'G1', 'en_pista'),
-  perro(3, '1013', 'TRISHA', 'Micaela Ramirez', 'Intermediate', 'G2', 'pendiente'),
+  perro(1, '101', 'BRUNO', 'Guía Uno', 'XS', 'G1', 'corrido', resultadoRocky),
+  perro(2, '102', 'CHISPA', 'Guía Dos', 'Small', 'G1', 'en_pista'),
+  perro(3, '103', 'NIEBLA', 'Guía Tres', 'Intermediate', 'G2', 'pendiente'),
   perro(4, '50', 'OTRO', 'Guía 4', 'Large', 'G1', 'pendiente', null, 'p2')
 ];
 
@@ -51,16 +51,16 @@ afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); });
 describe('mesa', () => {
   it('con un token vigente entra directo, sin pedir el PIN', async () => {
     montar();
-    expect(await screen.findByText('FURIA', { selector: '.mesa-actual-nombre' })).toBeTruthy();
+    expect(await screen.findByText('CHISPA', { selector: '.mesa-actual-nombre' })).toBeTruthy();
     expect(screen.queryByText('Control de mesa')).toBeNull();
   });
 
   it('arriba: el perro en pista, grande, con su formulario y el botón de largar el siguiente', async () => {
     montar();
-    await screen.findByText('FURIA', { selector: '.mesa-actual-nombre' });
+    await screen.findByText('CHISPA', { selector: '.mesa-actual-nombre' });
     const t = tarjeta();
-    expect(t.querySelector('.dorsal').textContent).toBe('941');
-    expect(t.querySelector('.mesa-actual-sub').textContent).toMatch(/Cristian Pace/);
+    expect(t.querySelector('.dorsal').textContent).toBe('102');
+    expect(t.querySelector('.mesa-actual-sub').textContent).toMatch(/Guía Dos/);
     expect(within(t).getByText('Small')).toBeTruthy();
     expect(t.textContent).toMatch(/Small\/Midi G1/);
     expect(within(t).getByLabelText('Tiempo')).toBeTruthy();
@@ -98,8 +98,8 @@ describe('mesa', () => {
 
   it('los próximos traen altura y grado; el programa lista las 3 pistas', async () => {
     const { container } = montar();
-    await screen.findByText('TRISHA');
-    const item = screen.getByText('TRISHA').closest('li');
+    await screen.findByText('NIEBLA');
+    const item = screen.getByText('NIEBLA').closest('li');
     expect(within(item).getByText('Intermediate')).toBeTruthy();
     expect(container.querySelectorAll('.mesa-pista-sel')).toHaveLength(3);
   });
@@ -134,7 +134,7 @@ describe('mesa', () => {
     fireEvent.click(within(tarjeta()).getByText('Guardar y largar el siguiente'));
 
     // Todavía sin respuesta del servidor: arriba ya está el siguiente, listo para tipear.
-    expect(within(tarjeta()).getByText('TRISHA')).toBeTruthy();
+    expect(within(tarjeta()).getByText('NIEBLA')).toBeTruthy();
     expect(within(tarjeta()).getByLabelText('Tiempo')).toBe(document.activeElement);
     expect(within(tarjeta()).getByLabelText('Tiempo').value).toBe('');
     expect(pedidos[0]).toMatchObject({ url: '/api/ring/ring-1/resultado', body: { id: 'i2', tiempo: '37', avanzar: true } });
@@ -148,7 +148,7 @@ describe('mesa', () => {
     fireEvent.change(within(tarjeta()).getByLabelText('Tiempo'), { target: { value: '41,5' } });
     fireEvent.click(within(tarjeta()).getByText('Guardar y largar el siguiente'));
     await waitFor(() => expect(screen.getByText('Algo falló.')).toBeTruthy());
-    expect(within(tarjeta()).getByText('FURIA')).toBeTruthy();
+    expect(within(tarjeta()).getByText('CHISPA')).toBeTruthy();
     expect(within(tarjeta()).getByLabelText('Tiempo').value).toBe('41,5');
   });
 
@@ -156,7 +156,7 @@ describe('mesa', () => {
     montar();
     await screen.findByTestId('en-pista');
     fireEvent.click(within(tarjeta()).getByText('Guardar y largar el siguiente'));
-    expect(within(tarjeta()).getByText('FURIA')).toBeTruthy();
+    expect(within(tarjeta()).getByText('CHISPA')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toBe('Falta el tiempo.');
     expect(pedidos).toHaveLength(0);
   });
@@ -176,14 +176,14 @@ describe('mesa', () => {
   it('abajo: los que corrieron sin resultado, para cargarlos sin largar a nadie', async () => {
     montar();
     expect(await screen.findByText(/faltan cargar 1/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '976' }));
+    fireEvent.click(screen.getByRole('button', { name: '101' }));
     const editor = screen.getByTestId('editor-correccion');
-    expect(within(editor).getByText('ROCKY')).toBeTruthy();
+    expect(within(editor).getByText('BRUNO')).toBeTruthy();
     fireEvent.change(within(editor).getByLabelText('Tiempo'), { target: { value: '40' } });
     fireEvent.click(within(editor).getByText('Guardar resultado'));
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0].body).toMatchObject({ id: 'i1', tiempo: '40', avanzar: false });
-    expect(within(tarjeta()).getByText('FURIA')).toBeTruthy();   // arriba no cambió nada
+    expect(within(tarjeta()).getByText('CHISPA')).toBeTruthy();   // arriba no cambió nada
   });
 
   it('lo cargado se lista con penalización, calificación y puesto', async () => {
@@ -198,7 +198,7 @@ describe('mesa', () => {
     fireEvent.click(await screen.findByText('Ver (1 con resultado)'));
     const c = screen.getByTestId('clasificacion');
     expect(within(c).getByText('Small/Midi G1')).toBeTruthy();
-    expect(within(c).getByText('ROCKY')).toBeTruthy();
+    expect(within(c).getByText('BRUNO')).toBeTruthy();
     expect(c.querySelector('.cola-res').textContent).toBe('F: 6,5041,50 s');
     fireEvent.click(screen.getByText('Ocultar'));
     expect(screen.queryByTestId('clasificacion')).toBeNull();
@@ -224,6 +224,6 @@ describe('mesa', () => {
   it('con un token de otro ring pide el PIN', async () => {
     montar(tokenDe('otro-ring'));
     expect(await screen.findByText('Control de mesa')).toBeTruthy();
-    expect(screen.queryByText('FURIA')).toBeNull();
+    expect(screen.queryByText('CHISPA')).toBeNull();
   });
 });

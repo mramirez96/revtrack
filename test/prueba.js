@@ -417,9 +417,9 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     const FIX_G0 = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       .concat([
         'Revamp,Iniciante 1,G0,Small,,Marieli Sanoja,OREO,',
-        'Revamp,Iniciante 1,G0,Small,,Fabiana Balsano,TIAGO,',
-        'Revamp,Iniciante 1,G0,Medium,,Sofía Benitez,CHINA,',
-        'Revamp,Iniciante 1,G0,Large,,Victoria del Val,BRANCA,'
+        'Revamp,Iniciante 1,G0,Small,,Guía G0,PERRO4,',
+        'Revamp,Iniciante 1,G0,Medium,,Sofía Benitez,PERRO2,',
+        'Revamp,Iniciante 1,G0,Large,,Victoria del Val,PERRO5,'
       ]).join('\n') + '\n';
     await sembrarFixture(FIX_G0);
     const mesaG0 = await entrar('revamp', PIN);
@@ -429,25 +429,25 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       snapG0_0.lista.length === 4 && snapG0_0.lista.every(i => !i.dorsal),
       JSON.stringify(snapG0_0.lista.map(i => [i.dorsal, i.perro])));
     chequear('el orden inicial es por altura',
-      snapG0_0.lista.map(i => i.perro).join(',') === 'OREO,TIAGO,CHINA,BRANCA',
+      snapG0_0.lista.map(i => i.perro).join(',') === 'OREO,PERRO4,PERRO2,PERRO5',
       snapG0_0.lista.map(i => i.perro).join(','));
 
     // Archivo con nombres en vez de dorsales, en otro orden y en minúscula.
-    const csvNombres = 'puesto,perro,tiempo\n1,branca,28.4\n2,china,30.1\n3,tiago,31.7\n4,oreo,33.0\n';
+    const csvNombres = 'puesto,perro,tiempo\n1,perro5,28.4\n2,perro2,30.1\n3,perro4,31.7\n4,oreo,33.0\n';
     const impG0 = await accion('revamp', 'cargar_orden', mesaG0.token, { pistaId: pistaG0, csv: csvNombres });
     chequear('acepta un archivo con columna "perro" y sin "dorsal"', !impG0.error, JSON.stringify(impG0).slice(0, 140));
     chequear('reordena por nombre, respetando la altura',
-      impG0.snap.lista.map(i => i.perro).join(',') === 'TIAGO,OREO,CHINA,BRANCA',
+      impG0.snap.lista.map(i => i.perro).join(',') === 'PERRO4,OREO,PERRO2,PERRO5',
       impG0.snap.lista.map(i => i.perro).join(','));
     chequear('los 4 entraron por nombre', /4 en el orden del archivo/.test(String(impG0.aviso)), String(impG0.aviso));
 
-    const csvAcento = 'perro\nCHINA\nBRANCA\nTIAGO\nOREO\n';
+    const csvAcento = 'perro\nPERRO2\nPERRO5\nPERRO4\nOREO\n';
     const impAcento = await accion('revamp', 'cargar_orden', mesaG0.token, { pistaId: pistaG0, csv: csvAcento });
     chequear('el archivo en mayúsculas matchea igual',
-      impAcento.snap.lista.map(i => i.perro).join(',') === 'TIAGO,OREO,CHINA,BRANCA',
+      impAcento.snap.lista.map(i => i.perro).join(',') === 'PERRO4,OREO,PERRO2,PERRO5',
       impAcento.snap.lista.map(i => i.perro).join(','));
 
-    const impDesc = await accion('revamp', 'cargar_orden', mesaG0.token, { pistaId: pistaG0, csv: 'perro\nFANTASMA\nBRANCA\n' });
+    const impDesc = await accion('revamp', 'cargar_orden', mesaG0.token, { pistaId: pistaG0, csv: 'perro\nFANTASMA\nPERRO5\n' });
     chequear('un nombre que no corre la pista se reporta', /FANTASMA/.test(String(impDesc.aviso)), String(impDesc.aviso));
 
     const sinNada = await accion('revamp', 'cargar_orden', mesaG0.token, { pistaId: pistaG0, csv: 'puesto,tiempo\n1,28.4\n' });
@@ -599,10 +599,10 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     // Sin nombre: el evento se llama como la (única) cancha del archivo, no
     // con un nombre por defecto que nadie eligió.
     chequear('sin nombre, el evento toma el de la cancha del archivo',
-      dominio.sembrar(['ring,pista,perro', '3era Regional ABA,Agility 1 G1,LUCKY'].join('\n'))
-        .state.evento.nombre === '3era Regional ABA');
+      dominio.sembrar(['ring,pista,perro', 'Regional Ejemplo,Agility 1 G1,PERRO'].join('\n'))
+        .state.evento.nombre === 'Regional Ejemplo');
     chequear('sin nombre ni cancha, queda "Competencia"',
-      dominio.sembrar(['pista,perro', 'Agility 1,LUCKY'].join('\n')).state.evento.nombre === 'Competencia');
+      dominio.sembrar(['pista,perro', 'Agility 1,PERRO'].join('\n')).state.evento.nombre === 'Competencia');
     chequear('cargó las 2 pistas nuevas',
       resN.rings[0].pistas.map(p => p.nombre).join(',') === 'Agility 1,Final',
       resN.rings[0].pistas.map(p => p.nombre).join(','));
@@ -653,8 +653,8 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       // Como vienen en el orden de salida de un regional: Mini y Midi, y en G0
       // Intermediate/Large en un solo bloque. Desordenado a propósito.
       const { state } = dominio.sembrar(['ring,pista,categoria,altura,dorsal,guia,perro',
-        'R,G0,G0,Intermediate/Large,,Ana,TITI', 'R,G0,G0,Midi,,Bea,CHINA',
-        'R,G0,G0,XS,,Caro,VAINILLA', 'R,G0,G0,Mini,,Dani,TIAGO'].join('\n'));
+        'R,G0,G0,Intermediate/Large,,Ana,PERRO1', 'R,G0,G0,Midi,,Bea,PERRO2',
+        'R,G0,G0,XS,,Caro,PERRO3', 'R,G0,G0,Mini,,Dani,PERRO4'].join('\n'));
       const orden = state.inscripciones.sort((a, b) => a.orden - b.orden).map(i => i.altura).join(',');
       chequear('Mini y Midi se ordenan como Small y Medium, no al final',
         orden === 'XS,Mini,Midi,Intermediate/Large', orden);
@@ -734,20 +734,20 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     const fila = (tiempo, faltas, rehuses, trs) => Resultados.calcular({ tiempo, faltas, rehuses, eliminado: false }, { trs });
     const trsReg3 = Resultados.trsDe(191, 4.5);   // Regional 3, G2 Agility: 191 m a 4,5 m/s
     const nuit = fila(37.81, 0, 0, trsReg3);
-    chequear('planilla: Nuit, limpia en 37,81 → 0,00 Cero Exc', nuit.total === 0 && nuit.calif === 'Cero Exc', JSON.stringify(nuit));
+    chequear('planilla: Perro A, limpia en 37,81 → 0,00 Cero Exc', nuit.total === 0 && nuit.calif === 'Cero Exc', JSON.stringify(nuit));
     const aluen = fila(39.5, 1, 1, trsReg3);
-    chequear('planilla: Aluen, "fn" en 39,5 → 10,00 MB', aluen.total === 10 && aluen.calif === 'MB', JSON.stringify(aluen));
+    chequear('planilla: Perro B, "fn" en 39,5 → 10,00 MB', aluen.total === 10 && aluen.calif === 'MB', JSON.stringify(aluen));
     const awka = fila(54.41, 2, 2, trsReg3);
-    chequear('planilla: Awka, "nfnf" en 54,41 → 31,97 No clasifica',
+    chequear('planilla: Perro C, "nfnf" en 54,41 → 31,97 No clasifica',
       Resultados.fmt(awka.total) === '31,97' && awka.calif === 'No clasifica', JSON.stringify(awka));
     const qoyai = fila(49.82, 0, 0, 49.37);
-    chequear('planilla: Qoyai, limpia pero 0,45 s sobre el TRS → 0,45 Exc (no es cero)',
+    chequear('planilla: Perro D, limpia pero 0,45 s sobre el TRS → 0,45 Exc (no es cero)',
       qoyai.total === 0.45 && qoyai.calif === 'Exc', JSON.stringify(qoyai));
     const ordenReg4 = Resultados.clasificar([
       { id: 'z', altura: 'Large', categoria: 'G2', estado: 'corrido', resultado: { tiempo: 38.72, faltas: 1, rehuses: 0 } },
       { id: 'q', altura: 'Large', categoria: 'G2', estado: 'corrido', resultado: { tiempo: 49.82, faltas: 0, rehuses: 0 } }
     ], { trs: 49.37 })[0].filas.map(f => f.id).join(',');
-    chequear('planilla Regional 4: Qoyai (0,45) queda arriba de Zamba (1 falta, 11 s más rápida)', ordenReg4 === 'q,z', ordenReg4);
+    chequear('planilla Regional 4: Perro D (0,45) queda arriba de Perro E (1 falta, 11 s más rápida)', ordenReg4 === 'q,z', ordenReg4);
     chequear('cortes de calificación de la planilla',
       ['Exc', 'MB', 'MB', 'B', 'B', 'No clasifica'].join() ===
       [5.99, 6, 15.99, 16, 25.99, 26].map(Resultados.calificacion).join(),
