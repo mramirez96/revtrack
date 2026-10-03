@@ -14,3 +14,6 @@ data/state.json.tmp
 data/state.json.roto-*
 data/state.json.incompatible-*
 data/state.json.anterior-*
+
+# Build del front (vite build): lo genera Vercel en cada deploy.
+dist/

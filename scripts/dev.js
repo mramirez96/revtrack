@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
-// Servidor de desarrollo local: sirve exactamente lo que vercel.json describe
-// (los estáticos de public/, las dos rutas de página, y api/index.js bajo
-// /api) sin necesitar el CLI de Vercel ni una cuenta — para probar el stack
-// nuevo end-to-end contra un Supabase local (`supabase start`).
+// Servidor de desarrollo local: lo mismo que vercel.json describe —api/index.js
+// bajo /api y la SPA de React para todo lo demás— en un solo proceso y sin
+// necesitar el CLI de Vercel ni una cuenta. El front lo sirve Vite como
+// middleware (con recarga en caliente), para probar el stack end-to-end contra
+// un Supabase local (`supabase start`).
 //
 // Uso:
 //   SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
@@ -18,13 +19,23 @@ const express = require('express');
 const api = require('../api/index.js');
 
 const PORT = process.env.PORT || 3000;
-const app = express();
 
-app.use(api);
-app.get('/ring/:ringId', (_req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'ring.html')));
-app.get('/mesa/:ringId', (_req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'mesa.html')));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+async function main() {
+  const { createServer } = await import('vite');
+  const vite = await createServer({
+    configFile: path.join(__dirname, '..', 'vite.config.mjs'),
+    server: { middlewareMode: true },
+    // 'spa': cualquier ruta que no sea un archivo (/ring/x, /mesa/x) devuelve
+    // index.html, igual que el rewrite de vercel.json.
+    appType: 'spa'
+  });
 
-app.listen(PORT, () => {
-  console.log(`\n  RevTrack (dev) escuchando en http://localhost:${PORT}\n`);
-});
+  const app = express();
+  app.use(api);
+  app.use(vite.middlewares);
+  app.listen(PORT, () => {
+    console.log(`\n  RevTrack (dev) escuchando en http://localhost:${PORT}\n`);
+  });
+}
+
+main().catch(e => { console.error(e); process.exit(1); });

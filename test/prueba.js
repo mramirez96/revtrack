@@ -27,7 +27,7 @@
 const path = require('path');
 const http = require('http');
 const dominio = require('../lib/dominio');
-const Resultados = require('../public/resultados');
+const Resultados = require('../shared/resultados.mjs');
 
 const DB_BASE = process.env.TEST_DATABASE_URL || process.env.SUPABASE_DB_URL;
 if (!DB_BASE) {

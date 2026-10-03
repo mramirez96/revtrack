@@ -1,32 +1,27 @@
 'use strict';
-// Corre las cinco suites y devuelve un exit code distinto de 0 si alguna falla.
+// Corre las dos suites y devuelve un exit code distinto de 0 si alguna falla.
 // `npm test`.
 //
-//   prueba.js                    integración: levanta el servidor real en un
-//                                sandbox y ejercita cada acción y cada guarda
-//   prueba-cliente.js            render de la vista de corredor
-//   prueba-cliente-terminada.js  ídem, con una pista ya terminada
-//   prueba-cliente-g0.js         ídem, en pistas sin dorsal (G0)
-//   prueba-mesa.js               render de la mesa
-//
-// Las de cliente ejecutan live.js / mesa.js dentro de un `node:vm` con un DOM
-// mínimo: no hace falta navegador ni headless.
+//   test/prueba.js           integración: levanta el servidor real contra un
+//                            esquema de Postgres descartable y ejercita cada
+//                            acción y cada guarda
+//   web/src/**/*.test.jsx    interfaz: la vista del corredor y la mesa en React,
+//                            con Vitest + Testing Library sobre jsdom (sin
+//                            navegador)
 
 const { spawnSync } = require('child_process');
 const path = require('path');
 
+const raiz = path.join(__dirname, '..');
 const SUITES = [
-  ['integración', 'prueba.js'],
-  ['vista de corredor', 'prueba-cliente.js'],
-  ['pista terminada', 'prueba-cliente-terminada.js'],
-  ['pistas sin dorsal', 'prueba-cliente-g0.js'],
-  ['mesa', 'prueba-mesa.js']
+  ['integración', [path.join(__dirname, 'prueba.js')]],
+  ['interfaz (React)', [path.join(raiz, 'node_modules', 'vitest', 'vitest.mjs'), 'run']]
 ];
 
 const resultados = [];
-for (const [nombre, archivo] of SUITES) {
-  console.log(`\n${'═'.repeat(64)}\n  ${nombre}  (test/${archivo})\n${'═'.repeat(64)}`);
-  const r = spawnSync(process.execPath, [path.join(__dirname, archivo)], { stdio: 'inherit' });
+for (const [nombre, args] of SUITES) {
+  console.log(`\n${'═'.repeat(64)}\n  ${nombre}\n${'═'.repeat(64)}`);
+  const r = spawnSync(process.execPath, args, { stdio: 'inherit', cwd: raiz });
   resultados.push({ nombre, ok: r.status === 0 });
 }
 

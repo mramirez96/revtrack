@@ -105,6 +105,8 @@ body {
 .pista-fila { display: flex; align-items: flex-start; gap: 16px; margin-top: 8px; }
 .pista-dorsal { font-size: clamp(64px, 22vw, 104px); flex: none; }
 .pista-quien { padding-top: 6px; min-width: 0; }
+/* Perro arriba, guía abajo: cada uno en su línea. */
+.pista-quien > span { display: block; }
 /* El nombre del perro es lo primario: por ahí se llama en la pista. El guía va
    de secundario, junto con altura y grado. De ahí los nombres por rol y no por
    contenido: estas clases también visten textos sueltos como "Nadie en pista". */
