@@ -96,7 +96,8 @@ describe('vista del corredor', () => {
   it('resultados en la lista, y la pestaña de clasificación', async () => {
     montar(armarSnapshot(lista({ tiempo: 38.2, faltas: 0, rehuses: 0, eliminado: false }), { pistas: [PISTA] }));
     await screen.findByTestId('orden');
-    expect(fila('41').querySelector('.cola-res').textContent).toBe('0,0038,20 s');
+    const res41 = [...fila('41').querySelectorAll('.cola-res > span')].map(s => s.textContent);
+    expect(res41).toEqual(['F: 0,00', '38,20 s']);
     fireEvent.click(screen.getByText('Clasificación'));
     const c = screen.getByTestId('clasificacion');
     expect(c.textContent).toMatch(/Intermediate\/Large G1/);   // Large va con Intermediate
@@ -104,6 +105,21 @@ describe('vista del corredor', () => {
     expect(c.querySelector('.etiq.calif.cero').textContent).toBe('Cero Exc');
     expect(c.textContent).not.toMatch(/Small\/Midi G2/);       // podio sin resultados: no aparece
     expect(localStorage.getItem('vista')).toBe('clasif');
+  });
+
+  it('con largo cargado muestra la velocidad; el descalificado dice DESC', async () => {
+    const conDesc = lista({ tiempo: 38.2, faltas: 0, rehuses: 0, eliminado: false }).map(i =>
+      i.dorsal === '42' ? { ...i, estado: 'corrido', resultado: { tiempo: 50, faltas: 0, rehuses: 0, eliminado: true } } : i);
+    montar(armarSnapshot(conDesc, { pistas: [{ ...PISTA, trs: { largo: 191, velocidad: 4.5, trs: 191 / 4.5 } }] }));
+    await screen.findByTestId('orden');
+    const res41 = [...fila('41').querySelectorAll('.cola-res > span')].map(s => s.textContent);
+    expect(res41).toEqual(['F: 0,00', '38,20 s | 5,00 m/s']);
+    fireEvent.click(screen.getByText('Clasificación'));
+    const c = screen.getByTestId('clasificacion');
+    const desc = within(c).getByText('Tango').closest('li');
+    expect(desc.querySelector('.puesto').textContent).toBe('DESC');
+    expect(desc.querySelector('.cola-res > span').textContent).toBe('DESC');
+    expect(c.textContent).toContain('TRS 42,44 s · 191 m a 4,5 m/s');
   });
 
   it('sin resultados no hay pestaña de clasificación', async () => {

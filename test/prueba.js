@@ -778,6 +778,22 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     const alAusente = await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '44'), tiempo: 30 });
     chequear('a un ausente no se le carga resultado', /ausente/.test(String(alAusente.error)), JSON.stringify(alAusente));
 
+    // Guardar el del que está en pista con `avanzar` larga al próximo, en el
+    // mismo paso de deshacer. Acá: 42 en pista, 44 ausente, después 46.
+    chequear('antes de avanzar, 42 está en pista', de(rs, '42').estado === 'en_pista', de(rs, '42').estado);
+    rs = (await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '42'), tiempo: '41,2', avanzar: true })).snap;
+    chequear('guardar con avanzar deja al que corrió como corrido, con su resultado',
+      de(rs, '42').estado === 'corrido' && de(rs, '42').resultado?.tiempo === 41.2, JSON.stringify(de(rs, '42')));
+    chequear('y entra el próximo pendiente (saltando al ausente)', de(rs, '46').estado === 'en_pista',
+      rs.lista.map(i => `${i.dorsal}:${i.estado}`).join(' '));
+    rs = (await accion('ring-1', 'deshacer', mesaRes.token)).snap;
+    chequear('un solo "deshacer" revierte el resultado y el avance juntos',
+      de(rs, '42').estado === 'en_pista' && de(rs, '42').resultado === null && de(rs, '46').estado === 'pendiente',
+      rs.lista.map(i => `${i.dorsal}:${i.estado}:${i.resultado ? 'r' : '-'}`).join(' '));
+    rs = (await accion('ring-1', 'resultado', mesaRes.token, { id: idDe(rs, '45'), tiempo: '38,52', faltas: 1, avanzar: true })).snap;
+    chequear('corregir a uno que ya corrió no avanza a nadie', de(rs, '42').estado === 'en_pista',
+      rs.lista.map(i => `${i.dorsal}:${i.estado}`).join(' '));
+
     // Persistido en Postgres, no sólo en el snapshot de la respuesta.
     await reiniciarServidor();
     rs = await snapshot('ring-1');

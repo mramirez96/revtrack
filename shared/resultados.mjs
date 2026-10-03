@@ -161,17 +161,37 @@ export function leerNumero(v) {
 
 export const fmt = n => (n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// Velocidad del recorrido (m/s), como la columna de la planilla: largo ÷
+// tiempo. null si la pista no tiene el largo cargado o no hay tiempo.
+export function velocidad(largo, tiempo) {
+  return largo > 0 && tiempo > 0 ? largo / tiempo : null;
+}
+
+// Cómo se muestra un resultado, en dos partes con el mismo peso: la
+// penalización ("F: 5,00", o "DESC" si quedó descalificado) y el recorrido
+// ("38,52 s | 4,96 m/s"; la velocidad sólo si la pista tiene largo).
+export function lineasResultado(calc, regla) {
+  if (!calc) return null;
+  const vel = calc.tiempo !== null ? velocidad(regla?.largo, calc.tiempo) : null;
+  return {
+    faltas: calc.eliminado ? 'DESC' : `F: ${fmt(calc.total)}`,
+    recorrido: [calc.tiempo !== null ? `${fmt(calc.tiempo)} s` : '', vel ? `${fmt(vel)} m/s` : '']
+      .filter(Boolean).join(' | ')
+  };
+}
+
 // Una línea corta para mostrar al lado de un perro.
 export function resumenCorto(calc) {
   if (!calc) return '';
-  if (calc.eliminado) return 'Eliminado';
-  return `${fmt(calc.total)} pen. · ${calc.calif}${calc.tiempo !== null ? ` · ${fmt(calc.tiempo)} s` : ''}`;
+  const t = calc.tiempo !== null ? ` · ${fmt(calc.tiempo)} s` : '';
+  if (calc.eliminado) return `DESC${t}`;
+  return `F: ${fmt(calc.total)}${t} · ${calc.calif}`;
 }
 
 // El desglose de dónde salió la penalización: "1 falta · 1 negativa · 2,48 de tiempo".
 export function desglose(calc) {
   if (!calc) return '';
-  if (calc.eliminado) return calc.motivo === 'eliminado' ? 'Eliminado' : `Eliminado (${calc.motivo})`;
+  if (calc.eliminado) return calc.motivo === 'eliminado' ? 'Descalificado' : `Descalificado (${calc.motivo})`;
   const partes = [];
   if (calc.faltas) partes.push(`${calc.faltas} ${calc.faltas === 1 ? 'falta' : 'faltas'}`);
   if (calc.rehuses) partes.push(`${calc.rehuses} ${calc.rehuses === 1 ? 'negativa' : 'negativas'}`);

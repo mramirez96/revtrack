@@ -21,10 +21,14 @@ const base = (resultadoRocky = null) => [
 
 let snap;
 let respuestaAccion;
+let pedidos;
 function montar(token = tokenDe('ring-1')) {
   localStorage.setItem('mesaToken', token);
-  vi.stubGlobal('fetch', fetchFalso(async url => {
-    if (url.startsWith('/api/ring/ring-1/')) return respuestaAccion();
+  vi.stubGlobal('fetch', fetchFalso(async (url, op) => {
+    if (url.startsWith('/api/ring/ring-1/')) {
+      pedidos.push({ url, body: JSON.parse(op.body) });
+      return respuestaAccion(url, op);
+    }
     if (url.startsWith('/api/ring/ring-1')) return { status: 200, json: snap };
     return { status: 404 };
   }));
@@ -35,9 +39,12 @@ function montar(token = tokenDe('ring-1')) {
   );
 }
 
+const tarjeta = () => screen.getByTestId('en-pista');
+
 beforeEach(() => {
   snap = armarSnapshot(base(), { pistas: PISTAS });
   respuestaAccion = () => ({ status: 200, json: {} });
+  pedidos = [];
 });
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); });
 
@@ -48,12 +55,45 @@ describe('mesa', () => {
     expect(screen.queryByText('Control de mesa')).toBeNull();
   });
 
-  it('el perro en pista, con el guía y la altura/grado de secundario', async () => {
-    const { container } = montar();
+  it('arriba: el perro en pista, grande, con su formulario y el botón de largar el siguiente', async () => {
+    montar();
     await screen.findByText('FURIA', { selector: '.mesa-actual-nombre' });
-    const sub = container.querySelector('.mesa-actual .mesa-actual-sub');
-    expect(sub.textContent).toMatch(/Cristian Pace/);
-    expect(within(sub).getByText('Small')).toBeTruthy();
+    const t = tarjeta();
+    expect(t.querySelector('.dorsal').textContent).toBe('941');
+    expect(t.querySelector('.mesa-actual-sub').textContent).toMatch(/Cristian Pace/);
+    expect(within(t).getByText('Small')).toBeTruthy();
+    expect(t.textContent).toMatch(/Small\/Midi G1/);
+    expect(within(t).getByLabelText('Tiempo')).toBeTruthy();
+    expect(within(t).getByLabelText('Sumar negativas')).toBeTruthy();
+    expect(within(t).getByText('Guardar y largar el siguiente')).toBeTruthy();
+  });
+
+  it('"Siguiente sin resultado" queda abajo, en chico; ausente no existe más en la mesa', async () => {
+    montar();
+    await screen.findByTestId('en-pista');
+    expect(screen.getByText('Siguiente sin resultado').className).toMatch(/chico/);
+    expect(screen.queryByText('Siguiente', { exact: true })).toBeNull();
+    // El que no corre se carga como descalificado (así va en la planilla del club).
+    expect(screen.queryByText(/Marcar ausente/)).toBeNull();
+    expect(screen.queryByLabelText(/Marcar ausente/)).toBeNull();
+    expect(within(tarjeta()).getByLabelText('Descalificado')).toBeTruthy();
+  });
+
+  it('"Descalificado" (también el que no corre): sin tiempo, y larga al siguiente', async () => {
+    montar();
+    await screen.findByTestId('en-pista');
+    fireEvent.click(within(tarjeta()).getByLabelText('Descalificado'));
+    expect(tarjeta().textContent).toMatch(/No clasifica/);
+    fireEvent.click(within(tarjeta()).getByText('Guardar y largar el siguiente'));
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0].body).toMatchObject({ id: 'i2', tiempo: '', eliminado: true, avanzar: true });
+  });
+
+  it('con la pista sin arrancar, la acción grande es largar el primero', async () => {
+    snap = armarSnapshot(base().map(i => ({ ...i, estado: 'pendiente', resultado: null })), { pistas: PISTAS });
+    montar();
+    expect(await screen.findByText('Largar el primero')).toBeTruthy();
+    expect(screen.queryByLabelText('Tiempo')).toBeNull();
   });
 
   it('los próximos traen altura y grado; el programa lista las 3 pistas', async () => {
@@ -67,8 +107,7 @@ describe('mesa', () => {
   it('cargar orden sólo ofrece las pistas que no arrancaron', async () => {
     montar();
     const select = await screen.findByLabelText('Pista a reordenar');
-    const valores = [...select.querySelectorAll('option')].map(o => o.value);
-    expect(valores).toEqual(['p2', 'p3']);
+    expect([...select.querySelectorAll('option')].map(o => o.value)).toEqual(['p2', 'p3']);
   });
 
   it('si todas arrancaron, no ofrece importar y explica por qué', async () => {
@@ -78,24 +117,91 @@ describe('mesa', () => {
     expect(screen.queryByText('Aplicar orden')).toBeNull();
   });
 
-  it('el editor propone al último que corrió sin resultado, con su podio', async () => {
-    montar();
-    const editor = await screen.findByTestId('editor-resultado');
-    expect(within(editor).getByText('ROCKY')).toBeTruthy();
-    expect(within(editor).queryByText('FURIA')).toBeNull();
-    expect(editor.textContent).toMatch(/Small\/Midi G1/);     // XS va con Small/Midi
-    expect(within(editor).getByLabelText('Sumar negativas')).toBeTruthy();
-    expect(editor.textContent).toMatch(/Falta el tiempo/);
-    expect(screen.getByText(/faltan cargar 2/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: '941' })).toBeTruthy();   // "también falta"
-  });
-
   it('la vista previa calcula como el servidor (falta + exceso de TRS + calificación)', async () => {
     montar();
-    const editor = await screen.findByTestId('editor-resultado');
-    fireEvent.change(within(editor).getByLabelText('Tiempo'), { target: { value: '41,5' } });
-    fireEvent.click(within(editor).getByLabelText('Sumar faltas'));
-    expect(editor.textContent).toMatch(/6,50 pen\. · MB · 1 falta · 1,50 de tiempo · TRS 40,00 s/);
+    await screen.findByTestId('en-pista');
+    fireEvent.change(within(tarjeta()).getByLabelText('Tiempo'), { target: { value: '41,5' } });
+    fireEvent.click(within(tarjeta()).getByLabelText('Sumar faltas'));
+    expect(tarjeta().textContent).toMatch(/→ F: 6,50 · MB · 1 falta · 1,50 de tiempo · TRS 40,00 s/);
+  });
+
+  it('guardar el del que está en pista manda avanzar, y salta en el acto al siguiente', async () => {
+    let soltar;
+    respuestaAccion = () => new Promise(res => { soltar = () => res({ status: 200, json: {} }); });
+    montar();
+    await screen.findByTestId('en-pista');
+    fireEvent.change(within(tarjeta()).getByLabelText('Tiempo'), { target: { value: '37' } });
+    fireEvent.click(within(tarjeta()).getByText('Guardar y largar el siguiente'));
+
+    // Todavía sin respuesta del servidor: arriba ya está el siguiente, listo para tipear.
+    expect(within(tarjeta()).getByText('TRISHA')).toBeTruthy();
+    expect(within(tarjeta()).getByLabelText('Tiempo')).toBe(document.activeElement);
+    expect(within(tarjeta()).getByLabelText('Tiempo').value).toBe('');
+    expect(pedidos[0]).toMatchObject({ url: '/api/ring/ring-1/resultado', body: { id: 'i2', tiempo: '37', avanzar: true } });
+    await act(async () => { soltar(); });
+  });
+
+  it('si el servidor rechaza el guardado, vuelve al perro con lo tipeado', async () => {
+    respuestaAccion = () => ({ status: 500, json: { error: 'Algo falló.' } });
+    montar();
+    await screen.findByTestId('en-pista');
+    fireEvent.change(within(tarjeta()).getByLabelText('Tiempo'), { target: { value: '41,5' } });
+    fireEvent.click(within(tarjeta()).getByText('Guardar y largar el siguiente'));
+    await waitFor(() => expect(screen.getByText('Algo falló.')).toBeTruthy());
+    expect(within(tarjeta()).getByText('FURIA')).toBeTruthy();
+    expect(within(tarjeta()).getByLabelText('Tiempo').value).toBe('41,5');
+  });
+
+  it('sin tiempo no guarda ni salta: avisa y se queda en el perro', async () => {
+    montar();
+    await screen.findByTestId('en-pista');
+    fireEvent.click(within(tarjeta()).getByText('Guardar y largar el siguiente'));
+    expect(within(tarjeta()).getByText('FURIA')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('Falta el tiempo.');
+    expect(pedidos).toHaveLength(0);
+  });
+
+  it('lo que se está tipeando sobrevive a un snapshot que llega en el medio', async () => {
+    montar();
+    await screen.findByTestId('en-pista');
+    const tiempo = within(tarjeta()).getByLabelText('Tiempo');
+    tiempo.focus();
+    fireEvent.change(tiempo, { target: { value: '39,1' } });
+    act(() => canal.emitir('ring:ring-1', 'snapshot', armarSnapshot(base(), { pistas: PISTAS })));
+    const despues = within(tarjeta()).getByLabelText('Tiempo');
+    expect(despues.value).toBe('39,1');
+    expect(despues).toBe(document.activeElement);
+  });
+
+  it('abajo: los que corrieron sin resultado, para cargarlos sin largar a nadie', async () => {
+    montar();
+    expect(await screen.findByText(/faltan cargar 1/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '976' }));
+    const editor = screen.getByTestId('editor-correccion');
+    expect(within(editor).getByText('ROCKY')).toBeTruthy();
+    fireEvent.change(within(editor).getByLabelText('Tiempo'), { target: { value: '40' } });
+    fireEvent.click(within(editor).getByText('Guardar resultado'));
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0].body).toMatchObject({ id: 'i1', tiempo: '40', avanzar: false });
+    expect(within(tarjeta()).getByText('FURIA')).toBeTruthy();   // arriba no cambió nada
+  });
+
+  it('lo cargado se lista con penalización, calificación y puesto', async () => {
+    snap = armarSnapshot(base({ tiempo: 41.5, faltas: 1, rehuses: 0, eliminado: false }), { pistas: PISTAS });
+    montar();
+    expect(await screen.findByText(/F: 6,50 · 41,50 s · MB · 1º en Small\/Midi G1/)).toBeTruthy();
+  });
+
+  it('la clasificación, la misma que la de los corredores, se puede abrir desde la mesa', async () => {
+    snap = armarSnapshot(base({ tiempo: 41.5, faltas: 1, rehuses: 0, eliminado: false }), { pistas: PISTAS });
+    montar();
+    fireEvent.click(await screen.findByText('Ver (1 con resultado)'));
+    const c = screen.getByTestId('clasificacion');
+    expect(within(c).getByText('Small/Midi G1')).toBeTruthy();
+    expect(within(c).getByText('ROCKY')).toBeTruthy();
+    expect(c.querySelector('.cola-res').textContent).toBe('F: 6,5041,50 s');
+    fireEvent.click(screen.getByText('Ocultar'));
+    expect(screen.queryByTestId('clasificacion')).toBeNull();
   });
 
   it('un solo TRS para toda la pista, con largo y velocidad', async () => {
@@ -113,53 +219,6 @@ describe('mesa', () => {
     const trs = screen.getByLabelText('TRS');
     expect(trs.value).toBe('42,44');
     expect(trs.disabled).toBe(true);
-  });
-
-  it('con el anterior cargado pasa al que está en pista, y lista lo cargado', async () => {
-    snap = armarSnapshot(base({ tiempo: 41.5, faltas: 1, rehuses: 0, eliminado: false }), { pistas: PISTAS });
-    montar();
-    const editor = await screen.findByTestId('editor-resultado');
-    expect(within(editor).getByText('FURIA')).toBeTruthy();
-    expect(screen.getByText(/6,50 pen\. · MB · 41,50 s · 1º en Small\/Midi G1/)).toBeTruthy();
-  });
-
-  it('al guardar salta en el acto al próximo; si el servidor falla, vuelve con lo tipeado', async () => {
-    let soltar;
-    respuestaAccion = () => new Promise(res => { soltar = () => res({ status: 500, json: { error: 'Algo falló.' } }); });
-    montar();
-    const editor = await screen.findByTestId('editor-resultado');
-    fireEvent.change(within(editor).getByLabelText('Tiempo'), { target: { value: '41,5' } });
-    fireEvent.click(within(editor).getByText('Guardar resultado'));
-
-    // Todavía sin respuesta del servidor: ya está en el siguiente.
-    const ahora = screen.getByTestId('editor-resultado');
-    expect(within(ahora).getByText('FURIA')).toBeTruthy();
-    expect(within(ahora).getByLabelText('Tiempo')).toBe(document.activeElement);
-
-    await act(async () => { soltar(); });
-    await waitFor(() => expect(within(screen.getByTestId('editor-resultado')).getByText('ROCKY')).toBeTruthy());
-    expect(within(screen.getByTestId('editor-resultado')).getByLabelText('Tiempo').value).toBe('41,5');
-    expect(screen.getByText('Algo falló.')).toBeTruthy();
-  });
-
-  it('sin tiempo no salta: avisa y se queda en el perro', async () => {
-    montar();
-    const editor = await screen.findByTestId('editor-resultado');
-    fireEvent.click(within(editor).getByText('Guardar resultado'));
-    expect(within(screen.getByTestId('editor-resultado')).getByText('ROCKY')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toBe('Falta el tiempo.');
-  });
-
-  it('lo que se está tipeando sobrevive a un snapshot que llega en el medio', async () => {
-    montar();
-    const editor = await screen.findByTestId('editor-resultado');
-    const tiempo = within(editor).getByLabelText('Tiempo');
-    tiempo.focus();
-    fireEvent.change(tiempo, { target: { value: '39,1' } });
-    act(() => canal.emitir('ring:ring-1', 'snapshot', armarSnapshot(base(), { pistas: PISTAS })));
-    const despues = within(screen.getByTestId('editor-resultado')).getByLabelText('Tiempo');
-    expect(despues.value).toBe('39,1');
-    expect(despues).toBe(document.activeElement);
   });
 
   it('con un token de otro ring pide el PIN', async () => {

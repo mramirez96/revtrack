@@ -188,6 +188,9 @@ body {
   margin-bottom: 5px;
 }
 .cola-item .dorsal { font-size: 27px; min-width: 46px; }
+/* Explícito: la clasificación también se muestra dentro de la mesa, que tiene
+   texto claro sobre fondo verde, y las tarjetas son blancas. */
+.cola-item { color: var(--slate); }
 .cola-quien { min-width: 0; flex: 1; }
 .cola-nombre { font-weight: 500; font-size: 16px; }
 .cola-sub { color: var(--mist); font-size: 13px; }
@@ -424,6 +427,22 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 .res-previa { margin: 10px 0 12px; font-size: 14px; color: var(--chalk); }
 .res-btns { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
 
+/* El formulario dentro de la tarjeta del perro en pista: lo que la mesa usa
+   todo el tiempo, así que todo grande y para el dedo. */
+.res-form.grande { margin-top: 16px; }
+.res-form.grande .res-campos { gap: 14px 22px; }
+.res-form.grande .res-campo input { width: 150px; font-size: 30px; padding: 12px 14px; }
+.res-form.grande .iconbtn { width: 56px; height: 56px; font-size: 24px; }
+.res-form.grande .res-cont b { font-size: 28px; min-width: 30px; }
+.res-form.grande .res-elim { font-size: 15px; }
+.res-form.grande .res-previa { font-size: 15px; }
+.res-form.grande .res-btns { display: block; }
+.res-form.grande .mesa-btn { width: 100%; }
+
+/* "Siguiente sin resultado": a mano, pero en segundo plano. */
+.mesa-secundarios { display: grid; gap: 10px; margin: 12px 0 4px; }
+.mesa-btn.chico { font-size: 15px; padding: 12px 10px; }
+
 .trs-fila {
   display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
   padding: 10px 0; border-bottom: 1px solid rgba(244,246,241,.12);
@@ -444,10 +463,9 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 .tab.activa { background: var(--turf); color: var(--chalk); box-shadow: none; font-weight: 600; }
 .cola-lista[hidden], #clasif[hidden], .eyebrow[hidden] { display: none; }
 
-.cola-res { text-align: right; line-height: 1.25; }
-.cola-res b { color: var(--slate); font-weight: 600; font-size: 15px; }
-.cola-res-t { font-size: 12px; }
-.cola-item.corriendo .cola-res b { color: var(--chalk); }
+/* Resultado: penalización y recorrido en dos líneas, con el mismo peso. */
+.cola-res { text-align: right; line-height: 1.35; }
+.cola-res > span { display: block; }
 
 .podio { margin-top: 18px; }
 .podio-tit {
@@ -457,6 +475,7 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 .clasif-trs { color: var(--mist); font-size: 12px; margin: 10px 0 0; }
 .podio-nota { color: var(--mist); font-size: 12px; margin: 4px 0 0; }
 .cola-item .puesto { font-size: 27px; min-width: 34px; color: var(--turf); }
+.cola-item .puesto.desc { font-size: 15px; letter-spacing: .02em; }
 .cola-item.eliminado { opacity: .55; border-left-color: var(--mist); }
 /* La calificación va como una etiqueta más; el cero es el único que se
    destaca, porque es lo que se festeja (y lo que sirve para ascender). */
@@ -478,3 +497,13 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Clasificación dentro de la mesa: el mismo componente que la vista pública. */
+.mesa-seccion-tope { display: flex; align-items: baseline; gap: 12px; }
+.mesa-seccion-tope .mesa-link { margin-left: auto; }
+.clasif-en-mesa .podio-tit { color: var(--chalk); }
+/* Las etiquetas de la mesa son claras (para el fondo verde); dentro de las
+   tarjetas blancas de la clasificación vuelven a las de la vista pública. */
+body.mesa .clasif-en-mesa .etiq { border-color: var(--line); color: var(--mist); }
+body.mesa .clasif-en-mesa .etiq.calif { color: var(--slate); }
+body.mesa .clasif-en-mesa .etiq.calif.cero { color: var(--chalk); }

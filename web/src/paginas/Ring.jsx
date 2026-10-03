@@ -3,8 +3,9 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import * as R from '../../../shared/resultados.mjs';
 import { pedirSnapshot, RingInexistente as NoExiste } from '../lib/api.js';
 import { useCanal } from '../lib/realtime.js';
-import { esMio, fmtLibre, guardado, minutos, plural, reloj } from '../lib/formato.js';
+import { esMio, guardado, minutos, plural, reloj } from '../lib/formato.js';
 import { Aviso, Dorsal, Etiquetas, RingInexistente, Tope, useAviso } from '../componentes/comunes.jsx';
+import Clasificacion, { ResultadoCorto } from '../componentes/Clasificacion.jsx';
 
 const cacheKey = (ringId, pistaId) => `snap:${ringId}:${pistaId || 'activa'}`;
 
@@ -278,8 +279,8 @@ function MiResultado({ mio, snap }) {
   const podio = (snap.clasificacion || []).find(p => p.filas.some(f => f.id === mio.id));
   return <>
     <div className="cuenta">
-      <span className="dorsal cuenta-n">{mio.puesto ? `${mio.puesto}º` : 'E'}</span>
-      <span className="cuenta-txt">{mio.puesto ? `de ${podio.clasificados} en ${mio.podio}` : `Eliminado en ${mio.podio}`}
+      <span className="dorsal cuenta-n">{mio.puesto ? `${mio.puesto}º` : 'DESC'}</span>
+      <span className="cuenta-txt">{mio.puesto ? `de ${podio.clasificados} en ${mio.podio}` : `Descalificado en ${mio.podio}`}
         <br /><span className="cuenta-sub">{R.resumenCorto(mio.res)} · {R.desglose(mio.res)}</span>
       </span>
     </div>
@@ -287,16 +288,6 @@ function MiResultado({ mio, snap }) {
       <p className="cuenta-sub">Provisorio: {podio.faltan === 1 ? 'falta 1' : `faltan ${podio.faltan}`} por correr en tu podio.</p>
     )}
   </>;
-}
-
-// Penalización arriba, tiempo abajo: lo primero es lo que ordena el podio.
-function ResCola({ res }) {
-  return (
-    <span className="cola-eta cola-res mono">
-      <b>{res.eliminado ? 'E' : R.fmt(res.total)}</b><br />
-      <span className="cola-res-t">{res.tiempo !== null ? `${R.fmt(res.tiempo)} s` : ''}</span>
-    </span>
-  );
 }
 
 const MARCA = {
@@ -352,7 +343,7 @@ function Orden({ snap, clave }) {
               <span className="cola-nombre">{i.perro}</span><br />
               <span className="cola-sub">{i.guia}<Etiquetas i={i} /></span>
             </span>
-            {i.res ? <ResCola res={i.res} /> : (
+            {i.res ? <ResultadoCorto res={i.res} regla={snap.trs} /> : (
               <span className="cola-eta mono">{marca
                 ? marca.nota
                 : snap.pista?.arrancada ? reloj(idx * snap.segPerro) : `${idx + 1}º`}</span>
@@ -361,39 +352,5 @@ function Orden({ snap, clave }) {
         );
       })}
     </ul>
-  );
-}
-
-// "TRS 42,44 s · 191 m a 4,5 m/s": de dónde salió, para quien quiera hacer la cuenta.
-function trsTexto(r) {
-  if (!r?.trs) return 'sin TRS';
-  return `TRS ${R.fmt(r.trs)} s${r.largo ? ` · ${fmtLibre(r.largo)} m a ${fmtLibre(r.velocidad)} m/s` : ''}`;
-}
-
-function Clasificacion({ snap, clave }) {
-  return (
-    <div data-testid="clasificacion">
-      {/* Un solo TRS para toda la pista: se dice una vez, arriba de los podios. */}
-      <p className="clasif-trs mono">{trsTexto(snap.trs)}</p>
-      {snap.clasificacion.filter(p => p.filas.length).map(p => (
-        <div key={p.id} className="podio">
-          <p className="podio-tit">{p.nombre}</p>
-          <ol className="cola-lista">
-            {p.filas.map(f => (
-              <li key={f.id} className={`cola-item ${esMio(f, clave) ? 'vos' : ''} ${f.res.eliminado ? 'eliminado' : ''}`}>
-                <span className="dorsal puesto">{f.puesto ?? 'E'}</span>
-                <span className="cola-quien">
-                  <span className="cola-nombre">{f.perro}</span><br />
-                  <span className="cola-sub">{f.dorsal ? `${f.dorsal} · ` : ''}{f.guia}<Etiquetas i={f} />{' '}
-                    <span className={`etiq calif ${f.res.calif === 'Cero Exc' ? 'cero' : ''}`}>{f.res.calif}</span></span>
-                </span>
-                <ResCola res={f.res} />
-              </li>
-            ))}
-          </ol>
-          {p.faltan > 0 && <p className="podio-nota">Provisoria · {p.faltan} por correr</p>}
-        </div>
-      ))}
-    </div>
   );
 }
