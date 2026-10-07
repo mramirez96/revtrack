@@ -3,14 +3,17 @@ import * as R from '../../../shared/resultados.mjs';
 import { fmtLibre } from '../lib/formato.js';
 import { BotonCarga } from './comunes.jsx';
 
+// `manual`: el TRS se tipeó (o se ajustó) a mano y no sigue a largo ÷ velocidad.
 const desdeSnap = r => ({
   largo: r?.largo ? fmtLibre(r.largo) : '',
   velocidad: r?.velocidad ? fmtLibre(r.velocidad) : '',
-  trs: r?.trs ? R.fmt(r.trs) : ''
+  trs: r?.trs ? R.fmt(r.trs) : '',
+  manual: !!r?.ajustado || (!!r?.trs && !r?.largo)
 });
 
 // TRS de la pista: uno solo para todos los que la corren. Como en la planilla,
-// largo ÷ velocidad; si ya viene calculado, se tipea directo.
+// largo ÷ velocidad propone el TRS; el juez lo puede ajustar a mano después
+// (también con la pista empezada), y al guardar se recalcula a todos.
 export default function TrsPista({ snap, accion, mostrar }) {
   // Lo tipeado, por pista, hasta que se guarda.
   const [borradores, setBorradores] = useState({});
@@ -19,38 +22,46 @@ export default function TrsPista({ snap, accion, mostrar }) {
   const pid = snap.pista.id;
   const v = borradores[pid] || desdeSnap(snap.trs);
   const calc = R.trsDe(R.leerNumero(v.largo), R.leerNumero(v.velocidad));
-  const cambiar = (campo, valor) => setBorradores(b => ({ ...b, [pid]: { ...v, [campo]: valor } }));
+  // Mientras no se lo toque, el TRS sigue a la cuenta.
+  const trsVisible = v.manual || !calc ? v.trs : R.fmt(calc);
+  const ajustado = v.manual && calc;
+  const cambiar = cambios => setBorradores(b => ({ ...b, [pid]: { ...v, ...cambios } }));
 
   async function guardar() {
     const body = { pistaId: pid, largo: v.largo, velocidad: v.velocidad };
-    // Con largo y velocidad manda la cuenta; el TRS tipeado sólo cuenta sin ellos.
-    if (!v.largo && !v.velocidad) body.trs = v.trs;
+    if (v.manual || !calc) body.trs = trsVisible;
     if (!(await accion('trs', body))) return;
     setBorradores(b => { const n = { ...b }; delete n[pid]; return n; });
-    mostrar(v.trs || v.largo ? 'TRS guardado. Los resultados se recalcularon.' : 'TRS borrado.');
+    mostrar(trsVisible || v.largo ? 'TRS guardado. Los resultados se recalcularon.' : 'TRS borrado.');
   }
 
-  const campo = (c, nombre, unidad, valor, extra = {}) => (
+  const campo = (nombre, unidad, valor, onChange) => (
     <label>{nombre} <input type="text" inputMode="decimal" autoComplete="off" placeholder="—" aria-label={nombre}
-                           value={valor} onChange={e => cambiar(c, e.target.value)} {...extra} /> {unidad}</label>
+                           value={valor} onChange={e => onChange(e.target.value)} /> {unidad}</label>
   );
 
   return (
     <section className="mesa-seccion">
       <p className="eyebrow">TRS · {snap.pista.nombre}</p>
       <p className="mesa-actual-sub" style={{ margin: '8px 0 6px' }}>
-        Uno para toda la pista: largo del recorrido ÷ velocidad, como en la planilla.
-        Si ya tenés el TRS calculado, dejá largo y velocidad vacíos y cargalo directo.
-        Cada segundo por encima del TRS suma un punto.
+        Uno para toda la pista. Largo ÷ velocidad lo calcula, como en la planilla; si el
+        juez lo ajusta, tipeá el TRS encima. Cada segundo por encima del TRS suma un punto.
       </p>
       <div className="trs-fila">
-        {campo('largo', 'Largo', 'm', v.largo)}
-        {campo('velocidad', 'Velocidad', 'm/s', v.velocidad)}
-        {campo('trs', 'TRS', 's', calc ? R.fmt(calc) : v.trs, { disabled: !!calc })}
+        {campo('Largo', 'm', v.largo, largo => cambiar({ largo }))}
+        {campo('Velocidad', 'm/s', v.velocidad, velocidad => cambiar({ velocidad }))}
+        {/* Tipear el TRS lo deja fijo; borrarlo lo devuelve a la cuenta. */}
+        {campo('TRS', 's', trsVisible, trs => cambiar({ trs, manual: trs.trim() !== '' }))}
         <BotonCarga className="btn chico" style={{ background: 'var(--chalk)', color: 'var(--turf)' }} onClick={guardar}>
           Guardar
         </BotonCarga>
       </div>
+      {ajustado && (
+        <p className="mesa-actual-sub" style={{ marginTop: 6 }}>
+          Ajustado a mano: con largo y velocidad daría {R.fmt(calc)} s.{' '}
+          <button className="mesa-link" onClick={() => cambiar({ trs: '', manual: false })}>Volver a la cuenta</button>
+        </p>
+      )}
     </section>
   );
 }

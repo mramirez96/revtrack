@@ -728,6 +728,17 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       JSON.stringify(rs.trs));
     chequear('y 38,52 s queda dentro: sólo cuenta la falta', de(rs, '45').res.total === 5 && de(rs, '45').res.calif === 'Exc',
       JSON.stringify(de(rs, '45').res));
+    chequear('calculado de largo y velocidad, no figura como ajustado', !rs.trs.ajustado, JSON.stringify(rs.trs));
+
+    // El juez lo ajusta: manda el TRS tipeado, el largo se conserva (para la velocidad).
+    rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, largo: '191', velocidad: '4,5', trs: '36' })).snap;
+    chequear('un TRS a mano manda sobre largo ÷ velocidad, y queda marcado como ajustado',
+      rs.trs.trs === 36 && rs.trs.ajustado === true && rs.trs.largo === 191, JSON.stringify(rs.trs));
+    chequear('y recalcula a todos: 38,52 s ahora suma 2,52 de tiempo',
+      Math.abs(de(rs, '45').res.exceso - 2.52) < 1e-6 && Math.abs(de(rs, '45').res.total - 7.52) < 1e-6,
+      JSON.stringify(de(rs, '45').res));
+    rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, largo: '191', velocidad: '4,5', trs: '42,44' })).snap;
+    chequear('tipear el mismo valor que da la cuenta no cuenta como ajuste', rs.trs.ajustado === false, JSON.stringify(rs.trs));
     rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, trs: '39' })).snap;
 
     // Filas reales de las planillas del club: la app tiene que dar lo mismo.

@@ -212,13 +212,40 @@ describe('mesa', () => {
     expect(screen.getByLabelText('Velocidad')).toBeTruthy();
   });
 
-  it('con largo y velocidad, el TRS se calcula solo y no se tipea', async () => {
+  it('con largo y velocidad el TRS se calcula solo, pero se puede ajustar a mano', async () => {
     montar();
     fireEvent.change(await screen.findByLabelText('Largo'), { target: { value: '191' } });
     fireEvent.change(screen.getByLabelText('Velocidad'), { target: { value: '4,5' } });
+    // La pista ya tenía un TRS cargado a mano (40): no se lo pisa en silencio.
+    expect(screen.getByLabelText('TRS').value).toBe('40,00');
+    expect(screen.getByText(/Ajustado a mano: con largo y velocidad daría 42,44 s/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Volver a la cuenta'));
     const trs = screen.getByLabelText('TRS');
     expect(trs.value).toBe('42,44');
-    expect(trs.disabled).toBe(true);
+    expect(trs.disabled).toBe(false);
+
+    fireEvent.change(trs, { target: { value: '45' } });
+    expect(screen.getByLabelText('TRS').value).toBe('45');
+    expect(screen.getByText(/Ajustado a mano: con largo y velocidad daría 42,44 s/)).toBeTruthy();
+    // Cambiar la velocidad no le pisa el ajuste.
+    fireEvent.change(screen.getByLabelText('Velocidad'), { target: { value: '4' } });
+    expect(screen.getByLabelText('TRS').value).toBe('45');
+
+    fireEvent.click(screen.getByText('Guardar'));
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0].body).toMatchObject({ largo: '191', velocidad: '4', trs: '45' });
+  });
+
+  it('"Volver a la cuenta" deshace el ajuste, y sin ajuste no se manda TRS', async () => {
+    montar();
+    fireEvent.change(await screen.findByLabelText('Largo'), { target: { value: '191' } });
+    fireEvent.change(screen.getByLabelText('Velocidad'), { target: { value: '4,5' } });
+    fireEvent.change(screen.getByLabelText('TRS'), { target: { value: '45' } });
+    fireEvent.click(screen.getByText('Volver a la cuenta'));
+    expect(screen.getByLabelText('TRS').value).toBe('42,44');
+    fireEvent.click(screen.getByText('Guardar'));
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0].body.trs).toBeUndefined();
   });
 
   it('con un token de otro ring pide el PIN', async () => {
