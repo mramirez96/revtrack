@@ -18,9 +18,14 @@ export function ResultadoCorto({ res, regla }) {
   );
 }
 
-// "TRS 42,44 s · 191 m a 4,5 m/s": de dónde salió, para quien quiera hacer la cuenta.
+// "TRS 42,44 s · 191 m a 4,5 m/s": de dónde salió, para quien quiera hacer la
+// cuenta. Si el juez lo ajustó, se dice, y cuánto daba la cuenta.
 function trsTexto(r) {
   if (!r?.trs) return 'sin TRS';
+  if (r.ajustado) {
+    return `TRS ${R.fmt(r.trs)} s (ajustado; con ${fmtLibre(r.largo)} m a ${fmtLibre(r.velocidad)} m/s daba ${
+      R.fmt(R.trsDe(r.largo, r.velocidad))} s)`;
+  }
   return `TRS ${R.fmt(r.trs)} s${r.largo ? ` · ${fmtLibre(r.largo)} m a ${fmtLibre(r.velocidad)} m/s` : ''}`;
 }
 

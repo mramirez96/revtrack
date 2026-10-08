@@ -451,8 +451,6 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 }
 .trs-fila label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #A9C0B2; }
 .trs-fila input { width: 92px; font-size: 17px; padding: 8px 10px; }
-/* TRS calculado de largo ÷ velocidad: se ve, pero no se tipea. */
-.trs-fila input:disabled { opacity: .7; border-style: dashed; }
 
 /* ── resultados: vista pública ───────────────────────────────────────── */
 .vista-tabs { display: flex; gap: 6px; }
