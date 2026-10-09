@@ -121,6 +121,11 @@ app.post('/api/ring/:ringId/resultado', auth.requiereMesa, accionRing(
 app.post('/api/ring/:ringId/trs', auth.requiereMesa, accionRing(
   (state, undo, req) => estado.fijarTrs(state, undo, req.params.ringId, req.body)));
 
+// El evento es uno solo, pero la mesa lo edita desde su ring: así el cambio se
+// difunde con el snapshot de siempre (que trae `evento`) y llega al lobby.
+app.post('/api/ring/:ringId/evento', auth.requiereMesa, accionRing(
+  (state, _undo, req) => estado.renombrarEvento(state, req.body)));
+
 app.post('/api/ring/:ringId/deshacer', auth.requiereMesa, accionRing(
   (state, undo) => estado.deshacer(state, undo)));
 

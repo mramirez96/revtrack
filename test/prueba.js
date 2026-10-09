@@ -603,6 +603,19 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
         .state.evento.nombre === 'Regional Ejemplo');
     chequear('sin nombre ni cancha, queda "Competencia"',
       dominio.sembrar(['pista,perro', 'Agility 1,PERRO'].join('\n')).state.evento.nombre === 'Competencia');
+    // Corregir nombre y fecha después, sin recargar: lo corrido no se toca.
+    const ringE = resN.rings[0].id;
+    const mesaE = await entrar(ringE, PIN);
+    const sinNombre = await accion(ringE, 'evento', mesaE.token, { nombre: '  ', fecha: '2026-10-05' });
+    chequear('renombrar sin nombre se rechaza', /Falta el nombre/.test(String(sinNombre.error)), JSON.stringify(sinNombre));
+    const fechaMalaE = await accion(ringE, 'evento', mesaE.token, { nombre: 'X', fecha: '5/10' });
+    chequear('renombrar con fecha inválida se rechaza', /fecha no es válida/.test(String(fechaMalaE.error)), JSON.stringify(fechaMalaE));
+    const ren = await accion(ringE, 'evento', mesaE.token, { nombre: ' Nacional Ejemplo ', fecha: '2026-10-05' });
+    chequear('la mesa renombra el evento', !ren.error, JSON.stringify(ren));
+    const resR = await resumen();
+    chequear('el evento queda con el nombre y la fecha nuevos, y las pistas siguen',
+      resR.evento.nombre === 'Nacional Ejemplo' && resR.evento.fecha === '2026-10-05' && resR.rings[0].pistas.length === 2,
+      JSON.stringify(resR.evento));
     chequear('cargó las 2 pistas nuevas',
       resN.rings[0].pistas.map(p => p.nombre).join(',') === 'Agility 1,Final',
       resN.rings[0].pistas.map(p => p.nombre).join(','));

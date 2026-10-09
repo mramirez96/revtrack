@@ -248,6 +248,20 @@ describe('mesa', () => {
     expect(pedidos[0].body.trs).toBeUndefined();
   });
 
+  it('el nombre y la fecha del evento se corrigen desde la mesa', async () => {
+    montar();
+    const nombre = await screen.findByLabelText('Nombre del evento');
+    expect(nombre.value).toBe('Winter Open');
+    const guardar = screen.getByText('Guardar nombre y fecha');
+    expect(guardar.disabled).toBe(true);
+    fireEvent.change(nombre, { target: { value: 'Nacional Ejemplo' } });
+    fireEvent.change(screen.getByLabelText('Fecha del evento'), { target: { value: '2026-10-10' } });
+    fireEvent.click(guardar);
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0].url).toBe('/api/ring/ring-1/evento');
+    expect(pedidos[0].body).toEqual({ nombre: 'Nacional Ejemplo', fecha: '2026-10-10' });
+  });
+
   it('con un token de otro ring pide el PIN', async () => {
     montar(tokenDe('otro-ring'));
     expect(await screen.findByText('Control de mesa')).toBeTruthy();

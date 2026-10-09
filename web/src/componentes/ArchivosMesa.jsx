@@ -59,6 +59,30 @@ export function CargarOrden({ snap, accion, mostrar }) {
   );
 }
 
+// Nombre y fecha del evento, editables sin recargar nada: lo que se cargó con
+// la competencia puede haber quedado mal, y lo corrido no se toca.
+export function DatosEvento({ snap, accion }) {
+  const [nombre, setNombre] = useState(snap.evento.nombre);
+  const [fecha, setFecha] = useState(snap.evento.fecha);
+  const cambio = nombre.trim() !== snap.evento.nombre || fecha !== snap.evento.fecha;
+
+  return (
+    <section className="mesa-seccion">
+      <p className="eyebrow">Competencia</p>
+      <div className="orden-carga">
+        <input type="text" aria-label="Nombre del evento" maxLength={120}
+               style={{ minWidth: 260, fontFamily: 'inherit' }} value={nombre} onChange={e => setNombre(e.target.value)} />
+        <input type="date" aria-label="Fecha del evento" style={{ fontFamily: 'inherit' }}
+               value={fecha} onChange={e => setFecha(e.target.value)} />
+        <BotonCarga className="mesa-btn secundario" style={{ fontSize: 16, padding: '12px 18px' }}
+                    disabled={!cambio || !nombre.trim()} onClick={() => accion('evento', { nombre, fecha })}>
+          Guardar nombre y fecha
+        </BotonCarga>
+      </div>
+    </section>
+  );
+}
+
 // Borra todo y siembra de cero desde un CSV. La palabra tipeada es la guarda:
 // un confirm() está a un toque de distancia y esto borra el día entero.
 export function NuevaCompetencia({ snap, token, mostrar, corridos }) {
