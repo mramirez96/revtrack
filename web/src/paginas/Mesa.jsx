@@ -8,7 +8,7 @@ import {
 } from '../componentes/comunes.jsx';
 import { CorregirResultados, EnPistaMesa, useResultados } from '../componentes/ResultadosMesa.jsx';
 import TrsPista from '../componentes/TrsPista.jsx';
-import { CargarOrden, NuevaCompetencia } from '../componentes/ArchivosMesa.jsx';
+import { CargarOrden, DatosEvento, NuevaCompetencia } from '../componentes/ArchivosMesa.jsx';
 import Clasificacion from '../componentes/Clasificacion.jsx';
 
 /* ── token de mesa ───────────────────────────────────────────────────── */
@@ -228,6 +228,9 @@ function Panel({ snap, ringId, token, accion, mostrar, setViendo }) {
     <Programa snap={snap} accion={accion} setViendo={setViendo} />
 
     <CargarOrden snap={snap} accion={accion} mostrar={mostrar} />
+
+    {/* Con key: si el evento cambia por otro lado, el formulario arranca de nuevo. */}
+    <DatosEvento key={`${snap.evento.nombre}|${snap.evento.fecha}`} snap={snap} accion={accion} />
 
     <NuevaCompetencia snap={snap} token={token} mostrar={mostrar} corridos={corridos} />
 
