@@ -715,7 +715,7 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     chequear('sin TRS no hay faltas de tiempo, y se avisa', de(rs, '42').res.exceso === 0 && de(rs, '42').res.sinTrs === true,
       JSON.stringify(de(rs, '42').res));
 
-    // TRS: uno solo por pista, el mismo para todos los que la corren.
+    // TRS: uno para toda la pista (abajo, uno por grupo de altura).
     const trsMalo = await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, trs: 'cuarenta' });
     chequear('un TRS que no es número se rechaza', /no es un número/.test(String(trsMalo.error)), JSON.stringify(trsMalo));
     const sinVel = await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, largo: 191 });
@@ -741,17 +741,43 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       JSON.stringify(rs.trs));
     chequear('y 38,52 s queda dentro: sólo cuenta la falta', de(rs, '45').res.total === 5 && de(rs, '45').res.calif === 'Exc',
       JSON.stringify(de(rs, '45').res));
-    chequear('calculado de largo y velocidad, no figura como ajustado', !rs.trs.ajustado, JSON.stringify(rs.trs));
 
-    // El juez lo ajusta: manda el TRS tipeado, el largo se conserva (para la velocidad).
+    // El juez da otro: el TRS tipeado manda, el largo se conserva (para la velocidad).
     rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, largo: '191', velocidad: '4,5', trs: '36' })).snap;
-    chequear('un TRS a mano manda sobre largo ÷ velocidad, y queda marcado como ajustado',
-      rs.trs.trs === 36 && rs.trs.ajustado === true && rs.trs.largo === 191, JSON.stringify(rs.trs));
+    chequear('un TRS tipeado manda sobre largo ÷ velocidad',
+      rs.trs.trs === 36 && rs.trs.largo === 191 && rs.trs.ajustado === undefined, JSON.stringify(rs.trs));
     chequear('y recalcula a todos: 38,52 s ahora suma 2,52 de tiempo',
       Math.abs(de(rs, '45').res.exceso - 2.52) < 1e-6 && Math.abs(de(rs, '45').res.total - 7.52) < 1e-6,
       JSON.stringify(de(rs, '45').res));
-    rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, largo: '191', velocidad: '4,5', trs: '42,44' })).snap;
-    chequear('tipear el mismo valor que da la cuenta no cuenta como ajuste', rs.trs.ajustado === false, JSON.stringify(rs.trs));
+
+    // Un TRS por grupo de altura: Small/Midi e Intermediate/Large a velocidades distintas.
+    const grupoMalo = await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, grupos: { 'Small Midi!': { trs: 40 } } });
+    chequear('un grupo de altura inválido se rechaza', /grupos de altura/.test(String(grupoMalo.error)), JSON.stringify(grupoMalo));
+    const velSinLargo = await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, grupos: { 'small-midi': { velocidad: 4 } } });
+    chequear('velocidad de un grupo sin largo se rechaza', /hace falta el largo/.test(String(velSinLargo.error)), JSON.stringify(velSinLargo));
+    rs = (await accion('ring-1', 'trs', mesaRes.token, {
+      pistaId: PISTA, largo: '191',
+      grupos: { 'small-midi': { velocidad: '4', trs: '' }, 'intermediate-large': { velocidad: '4,5', trs: '40' } }
+    })).snap;
+    chequear('por grupo: Small/Midi sale de la cuenta (191 ÷ 4 = 47,75), Intermediate/Large toma el tipeado',
+      rs.trs.largo === 191 && rs.trs.grupos['small-midi'].trs === 47.75 && rs.trs.grupos['intermediate-large'].trs === 40,
+      JSON.stringify(rs.trs));
+    chequear('el XS usa el TRS de Small/Midi: 38,52 s queda dentro', de(rs, '45').res.exceso === 0, JSON.stringify(de(rs, '45').res));
+    const podiosSM = rs.clasificacion.find(p => p.grupo === 'small-midi');
+    chequear('cada podio dice su TRS', podiosSM.regla.trs === 47.75 && podiosSM.regla.largo === 191, JSON.stringify(podiosSM.regla));
+    const porGrupo = Resultados.clasificar([
+      { id: 's', altura: 'Small', categoria: 'G2', estado: 'corrido', resultado: { tiempo: 42, faltas: 0, rehuses: 0 } },
+      { id: 'l', altura: 'Large', categoria: 'G2', estado: 'corrido', resultado: { tiempo: 42, faltas: 0, rehuses: 0 } }
+    ], { largo: 160, grupos: { 'small-midi': { trs: 45 }, 'intermediate-large': { trs: 40 } } });
+    chequear('misma pista, mismo tiempo: el Small entra en su TRS y el Large se pasa 2 s del suyo',
+      porGrupo.find(p => p.grupo === 'small-midi').filas[0].res.exceso === 0 &&
+      porGrupo.find(p => p.grupo === 'intermediate-large').filas[0].res.exceso === 2,
+      JSON.stringify(porGrupo.map(p => [p.nombre, p.filas[0].res.exceso])));
+    chequear('un TRS de antes (uno para todos) se sigue leyendo para cualquier altura',
+      Resultados.reglaDe({ trs: 39 }, 'Large').trs === 39 && Resultados.reglaDe({ trs: 39 }, 'Mini').trs === 39);
+    chequear('un grupo sin TRS queda sin TRS, pero con el largo para la velocidad',
+      Resultados.reglaDe({ largo: 160, grupos: { 'small-midi': { trs: 45 } } }, 'Large').trs === undefined &&
+      Resultados.reglaDe({ largo: 160, grupos: { 'small-midi': { trs: 45 } } }, 'Large').largo === 160);
     rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, trs: '39' })).snap;
 
     // Filas reales de las planillas del club: la app tiene que dar lo mismo.
