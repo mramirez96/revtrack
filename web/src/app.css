@@ -415,6 +415,7 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 }
 .res-editor .dorsal { font-size: 34px; }
 .res-campos { display: flex; flex-wrap: wrap; gap: 12px 18px; margin: 14px 0 12px; align-items: flex-end; }
+.res-campos + .res-campos { margin-top: 0; }
 .res-campo { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #A9C0B2; }
 .res-campo input,
 .trs-fila input {
@@ -434,6 +435,9 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 .res-form.grande { margin-top: 16px; }
 .res-form.grande .res-campos { gap: 14px 22px; }
 .res-form.grande .res-campo input { width: 150px; font-size: 30px; padding: 12px 14px; }
+/* El tiempo, solo en su renglón, toma el ancho. */
+.res-tiempo { flex: 1 1 100%; }
+.res-tiempo input, .res-form.grande .res-tiempo input { width: 100%; max-width: 320px; box-sizing: border-box; }
 .res-form.grande .iconbtn { width: 56px; height: 56px; font-size: 24px; }
 .res-form.grande .res-cont b { font-size: 28px; min-width: 30px; }
 .res-form.grande .res-elim { font-size: 15px; }
@@ -451,6 +455,7 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 }
 .trs-fila label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #A9C0B2; }
 .trs-fila input { width: 92px; font-size: 17px; padding: 8px 10px; }
+.trs-grupo { min-width: 140px; font-size: 14px; font-weight: 600; color: var(--chalk); }
 
 /* ── resultados: vista pública ───────────────────────────────────────── */
 .vista-tabs { display: flex; gap: 6px; }

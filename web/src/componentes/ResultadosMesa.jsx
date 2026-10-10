@@ -3,7 +3,7 @@ import * as R from '../../../shared/resultados.mjs';
 import { BotonCarga, Dorsal, Etiquetas } from './comunes.jsx';
 
 // Todo lo de cargar resultados en la mesa. El flujo normal vive arriba, en la
-// tarjeta del perro en pista: tiempo, faltas, negativas y "Guardar y largar el
+// tarjeta del perro en pista: faltas, negativas, tiempo y "Guardar y largar el
 // siguiente", que guarda y avanza el orden en un solo paso. Abajo quedan las
 // correcciones: los que corrieron sin resultado y los ya cargados.
 
@@ -104,15 +104,19 @@ function FormResultado({ perro, res, regla, grande, textoBoton, onGuardar, extra
 
   return (
     <div className={grande ? 'res-form grande' : 'res-form'}>
+      {/* Faltas y negativas arriba, el tiempo en su renglón: en el celular
+          entran los dos contadores lado a lado y el tiempo queda a lo ancho. */}
       <div className="res-campos">
-        <label className="res-campo"><span>Tiempo (s)</span>
+        <Contador nombre="Faltas" valor={b.faltas} onChange={faltas => cambiar({ faltas })} />
+        <Contador nombre="Negativas" valor={b.rehuses} onChange={rehuses => cambiar({ rehuses })} />
+      </div>
+      <div className="res-campos">
+        <label className="res-campo res-tiempo"><span>Tiempo (s)</span>
           <input ref={tiempo} type="text" inputMode="decimal" autoComplete="off" placeholder="38,52"
                  aria-label="Tiempo" value={b.tiempo}
                  onChange={e => cambiar({ tiempo: e.target.value })}
                  onKeyDown={e => { if (e.key === 'Enter') guardar(); }} />
         </label>
-        <Contador nombre="Faltas" valor={b.faltas} onChange={faltas => cambiar({ faltas })} />
-        <Contador nombre="Negativas" valor={b.rehuses} onChange={rehuses => cambiar({ rehuses })} />
       </div>
       <label className="orden-check res-elim">
         <input type="checkbox" checked={b.eliminado} onChange={e => cambiar({ eliminado: e.target.checked })} /> Descalificado
@@ -149,7 +153,7 @@ export function EnPistaMesa({ snap, res, accion }) {
         <span><span className="mesa-actual-nombre">{actual.perro}</span><br />
           <span className="mesa-actual-sub">{actual.guia}<Etiquetas i={actual} /> · {nombrePodio(actual)}</span></span>
       </div>
-      <FormResultado key={actual.id} perro={actual} res={res} regla={snap.trs} grande enfocar
+      <FormResultado key={actual.id} perro={actual} res={res} regla={R.reglaDe(snap.trs, actual.altura)} grande enfocar
                      textoBoton={otra ? 'Guardar resultado' : 'Guardar y largar el siguiente'}
                      onGuardar={b => res.guardar(actual, b, { avanzar: !otra })} />
     </>;
@@ -215,7 +219,7 @@ export function CorregirResultados({ snap, res }) {
             <span><span className="mesa-item-quien">{ed.perro}</span><br />
               <span className="mesa-item-sub">{ed.guia}<Etiquetas i={ed} /> · {nombrePodio(ed)}</span></span>
           </div>
-          <FormResultado key={ed.id} perro={ed} res={res} regla={snap.trs} textoBoton="Guardar resultado"
+          <FormResultado key={ed.id} perro={ed} res={res} regla={R.reglaDe(snap.trs, ed.altura)} textoBoton="Guardar resultado"
                          onGuardar={guardar}
                          extra={<>
                            {ed.resultado && (

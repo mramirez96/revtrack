@@ -103,6 +103,20 @@ export function podioDe(i) {
   };
 }
 
+// El TRS de una pista se guarda de dos maneras: uno para todos
+// ({ trs, largo?, velocidad? }, como era antes) o uno por grupo de altura,
+// con el largo compartido porque el recorrido es el mismo
+// ({ largo?, grupos: { 'small-midi': { trs, velocidad? }, … } }).
+// Esto devuelve la regla que le toca a un grupo: { trs?, largo?, velocidad? } o null.
+export function reglaDeGrupo(trsPista, grupoId) {
+  if (!trsPista) return null;
+  if (!trsPista.grupos) return trsPista.trs || trsPista.largo ? trsPista : null;
+  const g = trsPista.grupos[grupoId];
+  return g || trsPista.largo ? { largo: trsPista.largo, ...g } : null;
+}
+
+export const reglaDe = (trsPista, altura) => reglaDeGrupo(trsPista, grupoDeAltura(altura).id);
+
 const ordenPodios = (a, b) => rangoGrupo(a.grupo) - rangoGrupo(b.grupo) ||
   a.grupo.localeCompare(b.grupo) || grados(a.categoria, b.categoria);
 
@@ -112,22 +126,23 @@ export function trsDe(largo, velocidad) {
 }
 
 // Clasificación de una pista. `lista` son las inscripciones (con `resultado`
-// crudo), `regla` el TRS de la pista ({ trs, largo?, velocidad? }, o nada).
+// crudo), `trsPista` el TRS de la pista tal como se guarda (ver reglaDeGrupo).
+// Cada podio lleva su `regla`: los podios ya van por grupo de altura.
 // Devuelve un bloque por podio, en orden de alturas y de grados,
 // con los clasificados primero y los eliminados al final. Los que todavía
 // no tienen resultado no entran, pero se cuentan: una clasificación con
 // perros por correr es provisoria y hay que decirlo.
-export function clasificar(lista, regla) {
+export function clasificar(lista, trsPista) {
   const podios = new Map();
   for (const i of lista) {
     const pd = podioDe(i);
     if (!podios.has(pd.id)) {
-      podios.set(pd.id, { ...pd, filas: [], eliminados: [], faltan: 0 });
+      podios.set(pd.id, { ...pd, regla: reglaDeGrupo(trsPista, pd.grupo), filas: [], eliminados: [], faltan: 0 });
     }
     const p = podios.get(pd.id);
     if (i.estado === 'ausente') continue;
     const calc = (i.estado === 'corrido' || i.estado === 'en_pista') && i.resultado
-      ? calcular(i.resultado, regla) : null;
+      ? calcular(i.resultado, p.regla) : null;
     if (!calc) { p.faltan++; continue; }
     const fila = { id: i.id, dorsal: i.dorsal, perro: i.perro, guia: i.guia, altura: i.altura, res: calc };
     (calc.eliminado ? p.eliminados : p.filas).push(fila);

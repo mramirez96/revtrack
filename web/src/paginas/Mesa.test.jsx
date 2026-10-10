@@ -204,48 +204,44 @@ describe('mesa', () => {
     expect(screen.queryByTestId('clasificacion')).toBeNull();
   });
 
-  it('un solo TRS para toda la pista, con largo y velocidad', async () => {
+  it('un TRS por altura, con el largo compartido', async () => {
     montar();
-    expect((await screen.findByLabelText('TRS')).value).toBe('40,00');
-    expect(screen.getAllByLabelText('TRS')).toHaveLength(1);
-    expect(screen.getByLabelText('Largo')).toBeTruthy();
-    expect(screen.getByLabelText('Velocidad')).toBeTruthy();
+    // El TRS de antes (uno para todos) aparece en los dos grupos.
+    expect((await screen.findByLabelText('TRS Small/Midi')).value).toBe('40,00');
+    expect(screen.getByLabelText('TRS Intermediate/Large').value).toBe('40,00');
+    expect(screen.getAllByLabelText('Largo')).toHaveLength(1);
+    expect(screen.getByLabelText('Velocidad Small/Midi')).toBeTruthy();
+    expect(screen.getByLabelText('Velocidad Intermediate/Large')).toBeTruthy();
   });
 
-  it('con largo y velocidad el TRS se calcula solo, pero se puede ajustar a mano', async () => {
+  it('largo y velocidad proponen el TRS al tocarlos; después se escribe encima sin que se recalcule', async () => {
     montar();
     fireEvent.change(await screen.findByLabelText('Largo'), { target: { value: '191' } });
-    fireEvent.change(screen.getByLabelText('Velocidad'), { target: { value: '4,5' } });
-    // La pista ya tenía un TRS cargado a mano (40): no se lo pisa en silencio.
-    expect(screen.getByLabelText('TRS').value).toBe('40,00');
-    expect(screen.getByText(/Ajustado a mano: con largo y velocidad daría 42,44 s/)).toBeTruthy();
-    fireEvent.click(screen.getByText('Volver a la cuenta'));
-    const trs = screen.getByLabelText('TRS');
-    expect(trs.value).toBe('42,44');
-    expect(trs.disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText('Velocidad Small/Midi'), { target: { value: '4,5' } });
+    expect(screen.getByLabelText('TRS Small/Midi').value).toBe('42,44');
+    // El otro grupo no tiene velocidad: queda como estaba.
+    expect(screen.getByLabelText('TRS Intermediate/Large').value).toBe('40,00');
 
-    fireEvent.change(trs, { target: { value: '45' } });
-    expect(screen.getByLabelText('TRS').value).toBe('45');
-    expect(screen.getByText(/Ajustado a mano: con largo y velocidad daría 42,44 s/)).toBeTruthy();
-    // Cambiar la velocidad no le pisa el ajuste.
-    fireEvent.change(screen.getByLabelText('Velocidad'), { target: { value: '4' } });
-    expect(screen.getByLabelText('TRS').value).toBe('45');
+    fireEvent.change(screen.getByLabelText('TRS Small/Midi'), { target: { value: '45' } });
+    expect(screen.getByLabelText('TRS Small/Midi').value).toBe('45');
+    expect(screen.queryByText(/Ajustado a mano/)).toBeNull();
 
-    fireEvent.click(screen.getByText('Guardar'));
+    fireEvent.click(screen.getByText('Guardar TRS'));
     await waitFor(() => expect(pedidos).toHaveLength(1));
-    expect(pedidos[0].body).toMatchObject({ largo: '191', velocidad: '4', trs: '45' });
+    expect(pedidos[0].url).toBe('/api/ring/ring-1/trs');
+    expect(pedidos[0].body).toEqual({
+      pistaId: 'p1', largo: '191',
+      grupos: { 'small-midi': { velocidad: '4,5', trs: '45' }, 'intermediate-large': { velocidad: '', trs: '40,00' } }
+    });
   });
 
-  it('"Volver a la cuenta" deshace el ajuste, y sin ajuste no se manda TRS', async () => {
+  it('el formulario de resultado: faltas y negativas arriba, el tiempo abajo', async () => {
     montar();
-    fireEvent.change(await screen.findByLabelText('Largo'), { target: { value: '191' } });
-    fireEvent.change(screen.getByLabelText('Velocidad'), { target: { value: '4,5' } });
-    fireEvent.change(screen.getByLabelText('TRS'), { target: { value: '45' } });
-    fireEvent.click(screen.getByText('Volver a la cuenta'));
-    expect(screen.getByLabelText('TRS').value).toBe('42,44');
-    fireEvent.click(screen.getByText('Guardar'));
-    await waitFor(() => expect(pedidos).toHaveLength(1));
-    expect(pedidos[0].body.trs).toBeUndefined();
+    await screen.findByText('CHISPA', { selector: '.mesa-actual-nombre' });
+    const filas = [...tarjeta().querySelectorAll('.res-campos')];
+    expect(filas).toHaveLength(2);
+    expect(filas[0].textContent).toMatch(/Faltas.*Negativas/);
+    expect(within(filas[1]).getByLabelText('Tiempo')).toBeTruthy();
   });
 
   it('el nombre y la fecha del evento se corrigen desde la mesa', async () => {
