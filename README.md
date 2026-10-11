@@ -124,9 +124,10 @@ real rows from them:
 - Ranked by total penalty, then time. Exact ties share a placing.
 - Grading, same cut-offs as the club's spreadsheet: 0 *Cero Exc*, ≤5.99 *Exc*,
   ≤15.99 *MB*, ≤25.99 *B*, otherwise *No clasifica*.
-- **Podiums merge heights**, as this club awards them: XS, Small and Midi share one;
-  Intermediate and Large share another. Each is split by grade (G0 included), so the
-  podiums read *Small/Midi G1*, *Intermediate/Large G2*…
+- **Podiums merge heights**, as this club awards them: XS, Mini (Small) and Midi
+  (Medium) share one; Intermediate and Large share another. Each is split by grade,
+  Iniciantes (the old G0, accepted under either name) first, so the podiums read
+  *Mini/Midi Iniciantes*, *Mini/Midi G1*, *Intermediate/Large G2*…
 - Entering results never blocks *Siguiente*: dogs that ran without one show up as
   "faltan cargar" and every result stays editable (and undoable).
 

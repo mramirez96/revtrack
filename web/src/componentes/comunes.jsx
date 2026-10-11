@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { gradoDe } from '../../../shared/resultados.mjs';
 
-// El recuadro del dorsal se omite cuando no hay número (los G0), para no dejar
+// El recuadro del dorsal se omite cuando no hay número (los Iniciantes), para no dejar
 // un hueco donde no hay nada que poner.
 export function Dorsal({ i, className = 'dorsal' }) {
   return i.dorsal ? <span className={className}>{i.dorsal}</span> : null;
@@ -10,8 +11,9 @@ export function Dorsal({ i, className = 'dorsal' }) {
 // Altura y grado del perro. En la misma pista corren todos mezclados, así que
 // son el dato que dice quién es cada uno (y la mesa los necesita para acomodar
 // los saltos). Se omite la que el CSV no traiga, para no dejar un recuadro vacío.
+// El grado va con su nombre de reglamento: un "G0" del CSV se lee Iniciantes.
 export function Etiquetas({ i }) {
-  return [i.altura, i.categoria].filter(Boolean).map(t => (
+  return [i.altura, gradoDe(i.categoria).nombre].filter(Boolean).map(t => (
     <span key={t}> <span className="etiq">{t}</span></span>
   ));
 }

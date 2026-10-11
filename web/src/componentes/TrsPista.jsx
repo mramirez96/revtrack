@@ -26,7 +26,7 @@ function desdeSnap(trsPista, grupos) {
   };
 }
 
-// TRS de la pista, uno por grupo de altura (Small/Midi e Intermediate/Large
+// TRS de la pista, uno por grupo de altura (Mini/Midi e Intermediate/Large
 // suelen ir a velocidades distintas), con el largo compartido. Como en la
 // planilla, largo ÷ velocidad propone el TRS en el momento en que se tocan;
 // después el TRS es un campo más, y lo que diga es lo que se guarda.

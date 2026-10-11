@@ -185,7 +185,7 @@ function Turno({ snap, clave, setClave }) {
   const guardar = () => { if (tipeado.trim()) setClave(tipeado.trim()); };
   const cambiar = () => { setClave(''); setTipeado(''); };
 
-  // En una pista sin dorsales (los G0) se pide el nombre del perro; en una con
+  // En una pista sin dorsales (los Iniciantes) se pide el nombre del perro; en una con
   // números, el dorsal. Si hay de los dos, se aclara.
   const conDorsal = lista.some(i => i.dorsal);
   const sinDorsal = lista.some(i => !i.dorsal);
