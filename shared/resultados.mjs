@@ -17,6 +17,8 @@
 //     por más que se pase del TRS el perro no queda eliminado, sólo suma.
 //   - Se clasifica por menor penalización total y, a igualdad, menor tiempo.
 //   - Calificación por total: Cero Exc / Exc / MB / B / No clasifica.
+//   - En G2/G3 cada pista da puntos de ranking por puesto y calificación
+//     (Anexo I.A, Art. 55). Iniciantes y G1 no suman ranking: sólo podio.
 //   - Los podios juntan alturas: XS/Mini/Midi corren por uno, Intermediate/
 //     Large por otro, y cada uno se abre por grado (Iniciantes incluido).
 //     G2 y G3 van juntos, "G2/G3", salvo que la mesa los separe (Art. 34).
@@ -71,6 +73,25 @@ export function calificacion(total) {
   if (total <= 25.99) return 'B';
   return 'No clasifica';
 }
+
+// Puntos de ranking por pista (Anexo I.A del Reglamento Nacional 2026), por
+// calificación, del 1º al 20º. La tabla termina en 20; de ahí en más se
+// toma la última columna (1 punto). No clasifica y eliminados: 0.
+const TABLA_PUNTOS = {
+  'Cero Exc': [25, 21, 18, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1],
+  Exc: [21, 18, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1, 1],
+  MB: [18, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1, 1, 1],
+  B: [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1, 1, 1, 1]
+};
+
+export function puntosRanking(puesto, calif) {
+  const fila = TABLA_PUNTOS[calif];
+  if (!fila || !(puesto > 0)) return 0;
+  return fila[Math.min(puesto, fila.length) - 1];
+}
+
+// Sólo G2 y G3 suman para el ranking (Art. 54 y 55).
+export const sumaRanking = gradoId => gradoId === 'g2' || gradoId === 'g3' || gradoId === 'g2-g3';
 
 // Lo que tipea la mesa, crudo, más la regla del podio ({ trs }, puede
 // faltar) → la penalización calculada.
@@ -253,9 +274,12 @@ export function clasificar(lista, trsPista, opciones) {
       const prev = p.filas[n - 1];
       f.puesto = prev && prev.res.total === f.res.total && prev.res.tiempo === f.res.tiempo
         ? prev.puesto : n + 1;
+      // Un empate comparte puesto, y por lo tanto puntos.
+      if (sumaRanking(p.grado)) f.puntos = puntosRanking(f.puesto, f.res.calif);
     });
     p.clasificados = p.filas.length;
-    p.filas = p.filas.concat(p.eliminados.map(f => ({ ...f, puesto: null })));
+    const ceroPuntos = sumaRanking(p.grado) ? { puntos: 0 } : {};
+    p.filas = p.filas.concat(p.eliminados.map(f => ({ ...f, puesto: null, ...ceroPuntos })));
     delete p.eliminados;
   }
   return bloques.filter(p => p.filas.length || p.faltan).sort(ordenPodios);

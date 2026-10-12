@@ -868,6 +868,30 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       const p8 = podio([{ id: 'a', altura: 'Large', categoria: 'G2', estado: 'pendiente', resultado: null }], { trs: 45 });
       chequear('G2/G3 sin nadie corrido: vale el del juez', p8.regla.trs === 45 && !p8.regla.masRapido, JSON.stringify(p8.regla));
     }
+
+    // Puntos de ranking por pista (Anexo I.A): sólo G2/G3, por puesto y calificación.
+    {
+      chequear('tabla del Anexo I.A: 1º Cero 25, Exc 21, MB 18, B 16',
+        [Resultados.puntosRanking(1, 'Cero Exc'), Resultados.puntosRanking(1, 'Exc'),
+          Resultados.puntosRanking(1, 'MB'), Resultados.puntosRanking(1, 'B')].join() === '25,21,18,16');
+      chequear('3º Exc 16, 10º MB 8, 20º Cero 1',
+        Resultados.puntosRanking(3, 'Exc') === 16 && Resultados.puntosRanking(10, 'MB') === 8 &&
+        Resultados.puntosRanking(20, 'Cero Exc') === 1);
+      chequear('después del 20º, 1 punto; No clasifica, 0',
+        Resultados.puntosRanking(27, 'B') === 1 && Resultados.puntosRanking(2, 'No clasifica') === 0);
+      const l = (id, categoria, tiempo, faltas = 0, extra = {}) =>
+        ({ id, altura: 'Large', categoria, estado: 'corrido', resultado: { tiempo, faltas, rehuses: 0, ...extra } });
+      const pG2 = Resultados.clasificar([
+        l('a', 'G2', 30), l('b', 'G2', 31, 1), l('c', 'G2', 31, 1), l('d', 'G3', 32, 6), l('e', 'G2', 20, 0, { eliminado: true })
+      ], { trs: 45 })[0];
+      const pts = pG2.filas.map(f => `${f.id}:${f.puesto ?? '-'}:${f.puntos}`).join(' ');
+      chequear('G2/G3: 1º Cero 25; empatados 2º Exc 18 cada uno; 4º No clasifica 0; eliminado 0',
+        pts === 'a:1:25 b:2:18 c:2:18 d:4:0 e:-:0', pts);
+      const pG1 = Resultados.clasificar([l('a', 'G1', 30)], { trs: 45 })[0];
+      chequear('G1 no suma ranking: sin puntos', pG1.filas[0].puntos === undefined, JSON.stringify(pG1.filas[0]));
+      const pIni = Resultados.clasificar([l('a', 'Iniciantes', 30)], { trs: 45 })[0];
+      chequear('Iniciantes tampoco', pIni.filas[0].puntos === undefined);
+    }
     chequear('cortes de calificación de la planilla',
       ['Exc', 'MB', 'MB', 'B', 'B', 'No clasifica'].join() ===
       [5.99, 6, 15.99, 16, 25.99, 26].map(Resultados.calificacion).join(),

@@ -35,6 +35,9 @@ export function trsTexto(r) {
   return `TRS ${R.fmt(r.trs)} s${origen}${alt}`;
 }
 
+// Puntos de ranking de la pista (sólo G2/G3, Anexo I.A del reglamento).
+const pts = n => `${n} ${n === 1 ? 'pt' : 'pts'}`;
+
 // `clave`: el dorsal o nombre del que mira, para resaltarlo (sólo en la vista
 // del corredor; en la mesa no hay "vos").
 export default function Clasificacion({ snap, clave = '' }) {
@@ -53,7 +56,8 @@ export default function Clasificacion({ snap, clave = '' }) {
                 <span className="cola-quien">
                   <span className="cola-nombre">{f.perro}</span><br />
                   <span className="cola-sub">{f.dorsal ? `${f.dorsal} · ` : ''}{f.guia}<Etiquetas i={f} />{' '}
-                    <span className={`etiq calif ${f.res.calif === 'Cero Exc' ? 'cero' : ''}`}>{f.res.calif}</span></span>
+                    <span className={`etiq calif ${f.res.calif === 'Cero Exc' ? 'cero' : ''}`}>{f.res.calif}</span>
+                    {f.puntos !== undefined && <> <span className="etiq pts">{pts(f.puntos)}</span></>}</span>
                 </span>
                 <ResultadoCorto res={f.res} regla={p.regla} />
               </li>

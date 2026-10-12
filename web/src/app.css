@@ -487,6 +487,8 @@ body.mesa { background: var(--turf); color: var(--chalk); }
    destaca, porque es lo que se festeja (y lo que sirve para ascender). */
 .etiq.calif { color: var(--slate); }
 .etiq.calif.cero { background: var(--turf); border-color: var(--turf); color: var(--chalk); font-weight: 600; }
+/* Puntos de ranking (G2/G3): un dato más, sin destacar. */
+.etiq.pts { color: var(--slate); font-variant-numeric: tabular-nums; }
 .cola-item.eliminado .puesto { color: var(--mist); }
 
 /* ── avisos ───────────────────────────────────────────────────────────── */
@@ -511,7 +513,8 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 /* Las etiquetas de la mesa son claras (para el fondo verde); dentro de las
    tarjetas blancas de la clasificación vuelven a las de la vista pública. */
 body.mesa .clasif-en-mesa .etiq { border-color: var(--line); color: var(--mist); }
-body.mesa .clasif-en-mesa .etiq.calif { color: var(--slate); }
+body.mesa .clasif-en-mesa .etiq.calif,
+body.mesa .clasif-en-mesa .etiq.pts { color: var(--slate); }
 body.mesa .clasif-en-mesa .etiq.calif.cero { color: var(--chalk); }
 /* El selector de fecha nativo, con su ícono claro sobre el fondo verde. */
 .orden-carga input[type="date"] { color-scheme: dark; }
