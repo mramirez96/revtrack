@@ -8,8 +8,11 @@
 //   - 5 puntos por falta y 5 por negativa (rehúse; en el código, `rehuses`).
 //   - 1 punto por segundo (con centésimas) por encima del TRS, sumado al
 //     total: por eso pasarse del TRS también saca el "cero".
-//   - TRS = largo ÷ velocidad, uno por pista: el mismo número para todos los
-//     que la corren, aunque sea un open con G1 y G2 mezclados.
+//   - TRS del juez = largo ÷ velocidad, uno por grupo de altura (la misma
+//     velocidad para todos los grados), o tipeado a mano. Iniciantes y G1 usan
+//     ése. G2 y G3 usan el menor entre ése y el del más rápido + 18% (G2, y
+//     G2/G3 unificado) o + 15% (G3), redondeado hacia arriba al segundo
+//     (Reglamento Nacional 2026, Art. 33). Ver reglaDePodio.
 //   - La tercera negativa elimina. No hay TMR (tiempo máximo): el club no lo usa,
 //     por más que se pase del TRS el perro no queda eliminado, sólo suma.
 //   - Se clasifica por menor penalización total y, a igualdad, menor tiempo.
@@ -134,6 +137,7 @@ export function podioDe(i, opciones) {
   return {
     id: `${g.id}--${gr.id}`,
     grupo: g.id,
+    grado: gr.id,
     categoria: gr.nombre,
     rangoGrado: gr.rango,
     nombre: [g.nombre, gr.nombre].filter(Boolean).join(' ')
@@ -154,6 +158,55 @@ export function reglaDeGrupo(trsPista, grupoId) {
 
 export const reglaDe = (trsPista, altura) => reglaDeGrupo(trsPista, grupoDeAltura(altura).id);
 
+// Cuánto se le suma al más rápido en cada grado (Art. 33-C-e y D-e): 18% en
+// G2 —y en G2/G3 unificado—, 15% en G3. null: el grado usa sólo el del juez.
+export function porcentajeTrs(gradoId) {
+  if (gradoId === 'g3') return 15;
+  if (gradoId === 'g2' || gradoId === 'g2-g3') return 18;
+  return null;
+}
+
+// El más rápido + el porcentaje, redondeado hacia arriba al segundo (como
+// FCI): 35,20 s + 18% = 41,54 → 42 s.
+export function trsDelMasRapido(tiempo, pct) {
+  return Math.ceil(limpio(tiempo * (100 + pct) / 100));
+}
+
+// La regla de un podio: la del juez para su grupo de altura y, en G2/G3, el
+// TRS que sale del más rápido. "Más rápido sin penalizaciones": si nadie
+// terminó limpio, el más rápido de los que tienen menos faltas de recorrido,
+// como en FCI. Cambia a medida que corren, así que con perros por correr la
+// clasificación de G2/G3 es provisoria también por el TRS.
+// `calcs` son los resultados de los perros del podio, calculados sin TRS
+// (calcular(res, null)). Devuelve { trs?, largo?, velocidad?, juez?, masRapido? }
+// o null; `trs` es el que se aplica.
+export function reglaDePodio(trsPista, podio, calcs) {
+  const juez = reglaDeGrupo(trsPista, podio.grupo);
+  const pct = porcentajeTrs(podio.grado);
+  if (!pct) return juez;
+  const mejor = calcs
+    .filter(c => !c.eliminado && c.tiempo !== null)
+    .sort((a, b) => a.recorrido - b.recorrido || a.tiempo - b.tiempo)[0];
+  if (!mejor) return juez;
+  const rapido = trsDelMasRapido(mejor.tiempo, pct);
+  const delJuez = juez?.trs > 0 ? juez.trs : null;
+  return {
+    ...juez,
+    trs: delJuez !== null ? Math.min(delJuez, rapido) : rapido,
+    juez: delJuez,
+    masRapido: { tiempo: mejor.tiempo, pct, trs: rapido, conFaltas: mejor.recorrido > 0 }
+  };
+}
+
+// La regla que le toca a un perro, desde un snapshot: la de su podio, que el
+// servidor ya calculó; si su podio todavía no está (no tiene ni pendientes),
+// la del juez.
+export function reglaDePerro(snap, i) {
+  const id = podioDe(i, { separarG3: !!snap.evento?.separarG3 }).id;
+  const p = (snap.clasificacion || []).find(x => x.id === id);
+  return p ? p.regla : reglaDe(snap.trs, i.altura);
+}
+
 const ordenPodios = (a, b) => rangoGrupo(a.grupo) - rangoGrupo(b.grupo) ||
   a.grupo.localeCompare(b.grupo) || a.rangoGrado - b.rangoGrado ||
   a.categoria.localeCompare(b.categoria, 'es', { numeric: true });
@@ -172,23 +225,27 @@ export function trsDe(largo, velocidad) {
 // no tienen resultado no entran, pero se cuentan: una clasificación con
 // perros por correr es provisoria y hay que decirlo.
 export function clasificar(lista, trsPista, opciones) {
+  // Primero se reparte cada perro en su podio; la regla va después, porque en
+  // G2/G3 el TRS depende de los resultados del mismo podio.
   const podios = new Map();
   for (const i of lista) {
     const pd = podioDe(i, opciones);
-    if (!podios.has(pd.id)) {
-      podios.set(pd.id, { ...pd, regla: reglaDeGrupo(trsPista, pd.grupo), filas: [], eliminados: [], faltan: 0 });
-    }
+    if (!podios.has(pd.id)) podios.set(pd.id, { ...pd, conResultado: [], filas: [], eliminados: [], faltan: 0 });
     const p = podios.get(pd.id);
     if (i.estado === 'ausente') continue;
-    const calc = (i.estado === 'corrido' || i.estado === 'en_pista') && i.resultado
-      ? calcular(i.resultado, p.regla) : null;
-    if (!calc) { p.faltan++; continue; }
-    const fila = { id: i.id, dorsal: i.dorsal, perro: i.perro, guia: i.guia, altura: i.altura, res: calc };
-    (calc.eliminado ? p.eliminados : p.filas).push(fila);
+    if ((i.estado === 'corrido' || i.estado === 'en_pista') && i.resultado) p.conResultado.push(i);
+    else p.faltan++;
   }
 
   const bloques = [...podios.values()];
   for (const p of bloques) {
+    p.regla = reglaDePodio(trsPista, p, p.conResultado.map(i => calcular(i.resultado, null)));
+    for (const i of p.conResultado) {
+      const calc = calcular(i.resultado, p.regla);
+      const fila = { id: i.id, dorsal: i.dorsal, perro: i.perro, guia: i.guia, altura: i.altura, res: calc };
+      (calc.eliminado ? p.eliminados : p.filas).push(fila);
+    }
+    delete p.conResultado;
     p.filas.sort((a, b) => a.res.total - b.res.total || (a.res.tiempo ?? Infinity) - (b.res.tiempo ?? Infinity));
     // Empate exacto (misma penalización y mismo tiempo) comparte puesto:
     // 1, 1, 3 — como en cualquier tabla deportiva.

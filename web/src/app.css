@@ -456,6 +456,7 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 .trs-fila label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #A9C0B2; }
 .trs-fila input { width: 92px; font-size: 17px; padding: 8px 10px; }
 .trs-grupo { min-width: 140px; font-size: 14px; font-weight: 600; color: var(--chalk); }
+.trs-podio { flex-basis: 100%; font-size: 12px; color: #A9C0B2; }
 
 /* ── resultados: vista pública ───────────────────────────────────────── */
 .vista-tabs { display: flex; gap: 6px; }
