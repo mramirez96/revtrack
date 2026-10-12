@@ -291,6 +291,97 @@ export function clasificar(lista, trsPista, opciones) {
   return bloques.filter(p => p.filas.length || p.faltan).sort(ordenPodios);
 }
 
+// Puntos del combinado (Anexo I.B), por calificación, del 1º al 10º. Como en
+// la tabla por pista, después del 10º se toma la última columna (1 punto).
+const TABLA_COMBINADO = {
+  'Cero Exc': [10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
+  Exc: [9, 8, 7, 6, 5, 4, 3, 2, 1, 1],
+  MB: [8, 7, 6, 5, 4, 3, 2, 1, 1, 1],
+  B: [7, 6, 5, 4, 3, 2, 1, 1, 1, 1]
+};
+
+// Sólo puntúa el combinado de quien no quedó descalificado en ninguna pista
+// y sumó hasta 25,99 de faltas entre las dos (Art. 55).
+export const TOPE_COMBINADO = 25.99;
+
+export function puntosCombinado(puesto, calif) {
+  const fila = TABLA_COMBINADO[calif];
+  if (!fila || !(puesto > 0)) return 0;
+  return fila[Math.min(puesto, fila.length) - 1];
+}
+
+// Un mismo perro en las dos pistas: por dorsal y, si no tiene (Iniciantes),
+// por nombre. La misma regla que usa la mesa para importar un orden.
+export const claveDupla = i => String(i.dorsal ?? '').trim() || `perro:${clave(i.perro)}`;
+
+// En la planilla del combinado un descalificado en una pista cuenta 100 de
+// faltas y 0 de tiempo: así queda abajo, pero ordenado igual que los demás.
+const FALTAS_DESC = 100;
+
+// Clasificación de un combinado: dos pistas (`a` y `b`, cada una { lista,
+// trs }), sumadas perro por perro. Como en las planillas del Nacional 2026:
+//   - faltas (con las de tiempo) y tiempo se suman;
+//   - se ordena por faltas y, a igualdad, por tiempo;
+//   - la calificación es la de la suma, con los cortes de siempre;
+//   - descalificado (o ausente, o sin anotar) en alguna pista: no clasifica,
+//     va al final sin puesto;
+//   - en fecha de ranking, G2/G3 suman los puntos del Anexo I.B; 0 si pasó
+//     de 25,99.
+// Cada pista se calcula con su propia regla (TRS por podio), así que el
+// resultado de cada parte es el mismo que en su clasificación suelta. Un
+// perro con una de las dos todavía por correr no entra, pero se cuenta.
+export function clasificarCombinado(a, b, opciones) {
+  const porPista = [a, b].map(({ lista, trs }) => {
+    const res = new Map();
+    for (const p of clasificar(lista, trs, opciones)) for (const f of p.filas) res.set(f.id, f.res);
+    return new Map(lista.map(i => [claveDupla(i), { i, res: res.get(i.id) || null }]));
+  });
+
+  const podios = new Map();
+  const claves = new Set([...porPista[0].keys(), ...porPista[1].keys()]);
+  for (const k of claves) {
+    const [x, y] = porPista.map(m => m.get(k));
+    const i = (x || y).i;
+    const pd = podioDe(i, opciones);
+    if (!podios.has(pd.id)) podios.set(pd.id, { ...pd, filas: [], descalificados: [], faltan: 0 });
+    const p = podios.get(pd.id);
+
+    // Cada parte: { faltas, tiempo, desc } o null si todavía no corrió.
+    const parte = e => {
+      if (!e || e.i.estado === 'ausente') return { faltas: FALTAS_DESC, tiempo: 0, desc: true };
+      if (!e.res) return null;
+      return e.res.eliminado ? { faltas: FALTAS_DESC, tiempo: 0, desc: true }
+        : { faltas: e.res.total, tiempo: e.res.tiempo ?? 0, desc: false };
+    };
+    const partes = [parte(x), parte(y)];
+    if (partes.includes(null)) { p.faltan++; continue; }
+    const desc = partes.some(q => q.desc);
+    const faltas = limpio(partes[0].faltas + partes[1].faltas);
+    const fila = {
+      id: k, dorsal: i.dorsal, perro: i.perro, guia: i.guia, altura: i.altura, categoria: i.categoria,
+      partes, faltas, tiempo: limpio(partes[0].tiempo + partes[1].tiempo), desc,
+      calif: desc ? 'No clasifica' : calificacion(faltas)
+    };
+    (desc ? p.descalificados : p.filas).push(fila);
+  }
+
+  const orden = (u, v) => u.faltas - v.faltas || u.tiempo - v.tiempo;
+  const bloques = [...podios.values()];
+  for (const p of bloques) {
+    const puntua = sumaRanking(p.grado, opciones);
+    p.filas.sort(orden).forEach((f, n) => {
+      const prev = p.filas[n - 1];
+      f.puesto = prev && prev.faltas === f.faltas && prev.tiempo === f.tiempo ? prev.puesto : n + 1;
+      if (puntua) f.puntos = f.faltas <= TOPE_COMBINADO ? puntosCombinado(f.puesto, f.calif) : 0;
+    });
+    p.clasificados = p.filas.length;
+    p.filas = p.filas.concat(p.descalificados.sort(orden)
+      .map(f => ({ ...f, puesto: null, ...(puntua ? { puntos: 0 } : {}) })));
+    delete p.descalificados;
+  }
+  return bloques.filter(p => p.filas.length || p.faltan).sort(ordenPodios);
+}
+
 // "38,52" → 38.52. Acepta coma o punto, porque en un teclado de celular
 // argentino la coma es lo que está a mano. null si no es un número.
 export function leerNumero(v) {

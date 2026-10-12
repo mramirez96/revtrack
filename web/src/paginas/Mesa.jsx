@@ -9,7 +9,7 @@ import {
 import { CorregirResultados, EnPistaMesa, useResultados } from '../componentes/ResultadosMesa.jsx';
 import TrsPista from '../componentes/TrsPista.jsx';
 import { CargarOrden, DatosEvento, NuevaCompetencia } from '../componentes/ArchivosMesa.jsx';
-import Clasificacion from '../componentes/Clasificacion.jsx';
+import Clasificacion, { ClasificacionCombinado } from '../componentes/Clasificacion.jsx';
 
 /* ── token de mesa ───────────────────────────────────────────────────── */
 
@@ -206,6 +206,8 @@ function Panel({ snap, ringId, token, accion, mostrar, setViendo }) {
 
     <ClasificacionMesa snap={snap} />
 
+    <CombinadoMesa snap={snap} accion={accion} />
+
     <section className="mesa-seccion">
       <p className="eyebrow">{otra ? 'Orden de salida' : 'Próximos'}</p>
       <ul className="mesa-lista">
@@ -272,6 +274,38 @@ function Programa({ snap, accion, setViendo }) {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+// Combinado: esta pista se suma con otra de la cancha (típicamente un Jumping
+// con un Agility), o va sola. Es opcional: en una fecha puede no haber
+// ninguno, o uno solo (la final). Debajo, la clasificación sumada, plegada.
+function CombinadoMesa({ snap, accion }) {
+  const [ver, setVer] = useState(false);
+  if (!snap.pista) return null;
+  const con = snap.pistas.find(p => p.id === snap.pista.id)?.combinaCon || '';
+  const otras = snap.pistas.filter(p => p.id !== snap.pista.id);
+  if (!otras.length) return null;
+  const n = (snap.combinado?.clasificacion || []).reduce((a, p) => a + p.filas.length, 0);
+  return (
+    <section className="mesa-seccion">
+      <div className="mesa-seccion-tope">
+        <p className="eyebrow">Combinado · {snap.pista.nombre}</p>
+        {snap.combinado && (
+          <button className="mesa-link" onClick={() => setVer(!ver)}>
+            {ver ? 'Ocultar' : `Ver (${n} con las dos)`}
+          </button>
+        )}
+      </div>
+      <div className="orden-carga">
+        <select aria-label="Combina con" value={con}
+                onChange={e => accion('combinar', { pistaId: snap.pista.id, con: e.target.value || null })}>
+          <option value="">No combina: pista suelta</option>
+          {otras.map(p => <option key={p.id} value={p.id}>Combina con {p.nombre}</option>)}
+        </select>
+      </div>
+      {ver && snap.combinado && <div className="clasif-en-mesa"><ClasificacionCombinado combinado={snap.combinado} /></div>}
     </section>
   );
 }

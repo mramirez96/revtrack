@@ -5,7 +5,7 @@ import { pedirSnapshot, RingInexistente as NoExiste } from '../lib/api.js';
 import { useCanal } from '../lib/realtime.js';
 import { esMio, guardado, minutos, plural, reloj } from '../lib/formato.js';
 import { Aviso, Dorsal, Etiquetas, RingInexistente, Tope, useAviso } from '../componentes/comunes.jsx';
-import Clasificacion, { ResultadoCorto } from '../componentes/Clasificacion.jsx';
+import Clasificacion, { ClasificacionCombinado, ResultadoCorto } from '../componentes/Clasificacion.jsx';
 
 const cacheKey = (ringId, pistaId) => `snap:${ringId}:${pistaId || 'activa'}`;
 
@@ -288,7 +288,21 @@ function MiResultado({ mio, snap }) {
     {podio?.faltan > 0 && (
       <p className="cuenta-sub">Provisorio: {podio.faltan === 1 ? 'falta 1' : `faltan ${podio.faltan}`} por correr en tu podio.</p>
     )}
+    <MiCombinado mio={mio} snap={snap} />
   </>;
+}
+
+// Si la pista es parte de un combinado y ya hizo las dos, cómo va en la suma.
+function MiCombinado({ mio, snap }) {
+  const k = R.claveDupla(mio);
+  for (const p of snap.combinado?.clasificacion || []) {
+    const f = p.filas.find(x => x.id === k);
+    if (!f) continue;
+    const puesto = f.puesto ? `${f.puesto}º de ${p.clasificados}` : 'Descalificado';
+    const puntos = f.puntos !== undefined ? ` · ${f.puntos} ${f.puntos === 1 ? 'punto' : 'puntos'}` : '';
+    return <p className="cuenta-sub">Combinado: {puesto} · F: {R.fmt(f.faltas)} · {f.calif}{puntos}</p>;
+  }
+  return null;
 }
 
 const MARCA = {
@@ -297,11 +311,17 @@ const MARCA = {
   ausente: { clase: 'ausente', nota: 'ausente' }
 };
 
-// Orden de salida o clasificación. La pestaña sólo aparece cuando hay algún
-// resultado: antes, "Clasificación" sería una pantalla vacía.
+// Orden de salida, clasificación o combinado. Cada pestaña aparece cuando
+// tiene algo: antes, "Clasificación" sería una pantalla vacía, y el combinado
+// sólo existe si la pista es parte de uno y alguien ya hizo las dos.
 function Cola({ snap, clave }) {
-  const [vista, setVista] = useState(() => (guardado.leer('vista') === 'clasif' ? 'clasif' : 'orden'));
+  const [vista, setVista] = useState(() => {
+    const v = guardado.leer('vista');
+    return v === 'clasif' || v === 'combinado' ? v : 'orden';
+  });
   const hay = (snap.clasificacion || []).some(p => p.filas.length);
+  const hayComb = (snap.combinado?.clasificacion || []).some(p => p.filas.length);
+  const enComb = hayComb && vista === 'combinado';
   const enClasif = hay && vista === 'clasif';
   const elegir = v => { setVista(v); guardado.escribir('vista', v); };
 
@@ -310,11 +330,13 @@ function Cola({ snap, clave }) {
       <div className="wrap">
         {hay ? (
           <div className="vista-tabs">
-            <button className={`tab ${enClasif ? '' : 'activa'}`} onClick={() => elegir('orden')}>Orden de salida</button>
+            <button className={`tab ${enClasif || enComb ? '' : 'activa'}`} onClick={() => elegir('orden')}>Orden de salida</button>
             <button className={`tab ${enClasif ? 'activa' : ''}`} onClick={() => elegir('clasif')}>Clasificación</button>
+            {hayComb && <button className={`tab ${enComb ? 'activa' : ''}`} onClick={() => elegir('combinado')}>Combinado</button>}
           </div>
         ) : <p className="eyebrow">Orden de salida</p>}
-        {enClasif ? <Clasificacion snap={snap} clave={clave} /> : <Orden snap={snap} clave={clave} />}
+        {enComb ? <ClasificacionCombinado combinado={snap.combinado} clave={clave} />
+          : enClasif ? <Clasificacion snap={snap} clave={clave} /> : <Orden snap={snap} clave={clave} />}
         <p className="pie"><Link to="/">Ver todas las pistas</Link></p>
         <p className="firma">RevTrack · Powered by Revamp</p>
       </div>

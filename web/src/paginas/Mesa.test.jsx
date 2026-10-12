@@ -290,6 +290,18 @@ describe('mesa', () => {
     expect(pedidos[0].body).toEqual({ separar: true });
   });
 
+  it('la mesa arma un combinado eligiendo la otra pista', async () => {
+    montar();
+    const sel = await screen.findByLabelText('Combina con');
+    expect(sel.value).toBe('');
+    expect([...sel.options].map(o => o.textContent))
+      .toEqual(['No combina: pista suelta', 'Combina con Jumping 2', 'Combina con Agility 1']);
+    fireEvent.change(sel, { target: { value: 'p3' } });
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0].url).toBe('/api/ring/ring-1/combinar');
+    expect(pedidos[0].body).toEqual({ pistaId: 'p1', con: 'p3' });
+  });
+
   it('la fecha de ranking se prende desde la mesa', async () => {
     montar();
     const tilde = await screen.findByLabelText(/Fecha de ranking/);

@@ -132,6 +132,12 @@ real rows from them:
   independent dates, Art. 57, only have podiums) and only in G2/G3 (Anexo I.A, Art. 55), by placing and
   grading: 1st gets 25 with *Cero Exc*, 21 *Exc*, 18 *MB*, 16 *B*, down to 1 at 20th
   (and past it). *No clasifica* and eliminated get 0; tied dogs share the points.
+- **Combinados** are optional: the table pairs two rounds of the same ring (say the
+  final Jumping + Agility); any round left unpaired stays standalone. Faults (time
+  faults included) and times are added up, ranked by faults then time, graded on the
+  sum; a dog disqualified (or absent) in either round goes last without a placing.
+  On a ranking date G2/G3 get the Anexo I.B points, 0 above 25.99. Same rules as the
+  Nacional 2026 combinado sheets, which the tests reproduce row by row.
 - **Podiums merge heights**, as this club awards them: XS, Mini (Small) and Midi
   (Medium) share one; Intermediate and Large share another. Each is split by grade,
   Iniciantes (the old G0, accepted under either name) first, so the podiums read
