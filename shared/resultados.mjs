@@ -16,6 +16,7 @@
 //   - Calificación por total: Cero Exc / Exc / MB / B / No clasifica.
 //   - Los podios juntan alturas: XS/Mini/Midi corren por uno, Intermediate/
 //     Large por otro, y cada uno se abre por grado (Iniciantes incluido).
+//     G2 y G3 van juntos, "G2/G3", salvo que la mesa los separe (Art. 34).
 
 export const PEN_FALTA = 5;
 export const PEN_REHUSE = 5;
@@ -94,17 +95,20 @@ export function calcular(res, regla) {
 
 // Los grados del reglamento, en orden. Desde la v1.1 del Reglamento Nacional
 // (2026) el G0 se llama Iniciantes: se acepta cualquiera de los dos nombres y
-// se muestra el nuevo.
+// se muestra el nuevo. G2/G3 es el bloque unificado (Art. 34), que también
+// puede venir así en el CSV.
 const GRADOS = [
   { id: 'iniciantes', nombre: 'Iniciantes',
     alias: ['iniciantes', 'iniciante', 'ini', 'g0', 'grado-0', 'gr0', '0'] },
   { id: 'g1', nombre: 'G1', alias: ['g1', 'grado-1', 'gr1', '1'] },
   { id: 'g2', nombre: 'G2', alias: ['g2', 'grado-2', 'gr2', '2'] },
+  { id: 'g2-g3', nombre: 'G2/G3', alias: ['g2-g3', 'g2-3', 'grado-2-3'] },
   { id: 'g3', nombre: 'G3', alias: ['g3', 'grado-3', 'gr3', '3'] }
 ];
+const G2G3 = GRADOS.findIndex(g => g.id === 'g2-g3');
 
 // El grado de una inscripción: { id, nombre, rango }. Uno que no está en la
-// lista (un "Open", "G2/G3") queda con su nombre, después de los conocidos.
+// lista (un "Open") queda con su nombre, después de los conocidos.
 export function gradoDe(categoria) {
   const c = clave(categoria);
   const i = GRADOS.findIndex(g => g.alias.includes(c));
@@ -113,10 +117,20 @@ export function gradoDe(categoria) {
     : { id: 'sin-grado', nombre: '', rango: GRADOS.length + 1 };
 }
 
-// El podio de una inscripción: grupo de altura × grado.
-export function podioDe(i) {
+// El grado con el que se arma el podio: el del perro, salvo G2 y G3, que
+// comparten "G2/G3" mientras la mesa no los separe. Sin `separarG3` van
+// juntos, que es lo que el reglamento manda mientras no haya suficientes G3.
+export function gradoDePodio(categoria, { separarG3 = false } = {}) {
+  const gr = gradoDe(categoria);
+  if (separarG3 || (gr.id !== 'g2' && gr.id !== 'g3')) return gr;
+  return { id: 'g2-g3', nombre: 'G2/G3', rango: G2G3 };
+}
+
+// El podio de una inscripción: grupo de altura × grado. `opciones` son las
+// del evento ({ separarG3 }).
+export function podioDe(i, opciones) {
   const g = grupoDeAltura(i.altura);
-  const gr = gradoDe(i.categoria);
+  const gr = gradoDePodio(i.categoria, opciones);
   return {
     id: `${g.id}--${gr.id}`,
     grupo: g.id,
@@ -150,16 +164,17 @@ export function trsDe(largo, velocidad) {
 }
 
 // Clasificación de una pista. `lista` son las inscripciones (con `resultado`
-// crudo), `trsPista` el TRS de la pista tal como se guarda (ver reglaDeGrupo).
+// crudo), `trsPista` el TRS de la pista tal como se guarda (ver reglaDeGrupo),
+// `opciones` las del evento ({ separarG3 }, ver gradoDePodio).
 // Cada podio lleva su `regla`: los podios ya van por grupo de altura.
 // Devuelve un bloque por podio, en orden de alturas y de grados,
 // con los clasificados primero y los eliminados al final. Los que todavía
 // no tienen resultado no entran, pero se cuentan: una clasificación con
 // perros por correr es provisoria y hay que decirlo.
-export function clasificar(lista, trsPista) {
+export function clasificar(lista, trsPista, opciones) {
   const podios = new Map();
   for (const i of lista) {
-    const pd = podioDe(i);
+    const pd = podioDe(i, opciones);
     if (!podios.has(pd.id)) {
       podios.set(pd.id, { ...pd, regla: reglaDeGrupo(trsPista, pd.grupo), filas: [], eliminados: [], faltan: 0 });
     }

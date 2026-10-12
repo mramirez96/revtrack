@@ -691,12 +691,22 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
         { id: 'b', altura: 'Small', categoria: 'Iniciantes', estado: 'corrido', resultado: { tiempo: 31, faltas: 0, rehuses: 0 } },
         { id: 'c', altura: 'Small', categoria: 'G0', estado: 'corrido', resultado: { tiempo: 29, faltas: 0, rehuses: 0 } },
         { id: 'd', altura: 'Small', categoria: 'G1', estado: 'corrido', resultado: { tiempo: 32, faltas: 0, rehuses: 0 } }
-      ], {});
+      ], {}, { separarG3: true });
       const orden = bloques.map(p => p.nombre).join(' / ');
       chequear('Iniciantes va primero y junta G0 con Iniciantes',
         orden === 'Mini/Midi Iniciantes / Mini/Midi G1 / Mini/Midi G3', orden);
       chequear('el G0 y el Iniciantes compiten entre ellos',
         bloques[0].filas.map(f => f.id).join(',') === 'c,b', bloques[0].filas.map(f => f.id).join(','));
+      const juntos = Resultados.clasificar([
+        { id: 'a', altura: 'Large', categoria: 'G3', estado: 'corrido', resultado: { tiempo: 30, faltas: 0, rehuses: 0 } },
+        { id: 'b', altura: 'Large', categoria: 'G2', estado: 'corrido', resultado: { tiempo: 29, faltas: 0, rehuses: 0 } },
+        { id: 'c', altura: 'Large', categoria: 'G2/G3', estado: 'corrido', resultado: { tiempo: 31, faltas: 0, rehuses: 0 } }
+      ], {});
+      chequear('sin separar, G2, G3 y un "G2/G3" del CSV comparten podio',
+        juntos.length === 1 && juntos[0].nombre === 'Intermediate/Large G2/G3' &&
+        juntos[0].filas.map(f => f.id).join(',') === 'b,a,c',
+        juntos.map(p => `${p.nombre}: ${p.filas.map(f => f.id)}`).join(' / '));
+      chequear('la etiqueta del perro sigue diciendo su grado', Resultados.gradoDe('G3').nombre === 'G3');
     }
 
     /* ── 7b. resultados: tiempo, faltas, rehúses, TRS y clasificación ──── */
@@ -728,7 +738,8 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     chequear('el que está en pista ya puede tener resultado; la coma decimal se entiende',
       de(rs, '45').resultado?.tiempo === 38.52 && de(rs, '45').res?.total === 5,
       JSON.stringify(de(rs, '45')));
-    chequear('XS cae en el podio Mini/Midi de su grado', de(rs, '45').podio === 'Mini/Midi G2', de(rs, '45').podio);
+    chequear('XS cae en el podio Mini/Midi de su grado (G2, unificado con G3)',
+      de(rs, '45').podio === 'Mini/Midi G2/G3', de(rs, '45').podio);
     chequear('con un solo resultado es 1º', de(rs, '45').puesto === 1, String(de(rs, '45').puesto));
 
     rs = (await accion('ring-1', 'siguiente', mesaRes.token)).snap;   // 45 corrido, 42 a pista
@@ -851,11 +862,26 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       de(rs, '42').resultado === null && de(rs, '42').puesto === undefined, JSON.stringify(de(rs, '42')));
 
     const nombres = rs.clasificacion.map(p => p.nombre).join(' / ');
-    chequear('podios en orden: Mini/Midi antes que Intermediate/Large, y por grado',
-      nombres === 'Mini/Midi G1 / Mini/Midi G2 / Intermediate/Large G1 / Intermediate/Large G3', nombres);
-    const smG2 = rs.clasificacion.find(p => p.nombre === 'Mini/Midi G2');
+    chequear('podios en orden: Mini/Midi antes que Intermediate/Large, y por grado (G2 y G3 juntos)',
+      nombres === 'Mini/Midi G1 / Mini/Midi G2/G3 / Intermediate/Large G1 / Intermediate/Large G2/G3', nombres);
+    const smG2 = rs.clasificacion.find(p => p.nombre === 'Mini/Midi G2/G3');
     chequear('el podio cuenta los que faltan cargar (clasificación provisoria)',
       smG2.clasificados === 1 && smG2.faltan === 1, JSON.stringify(smG2));
+
+    // G3 con podio propio (Art. 34): es del evento, y se puede volver atrás.
+    chequear('de entrada G2 y G3 van juntos', rs.evento.separarG3 === false, JSON.stringify(rs.evento));
+    const sinDato = await accion('ring-1', 'separar_g3', mesaRes.token, {});
+    chequear('separar G3 sin decir sí o no se rechaza', !!sinDato.error, JSON.stringify(sinDato));
+    rs = (await accion('ring-1', 'separar_g3', mesaRes.token, { separar: true })).snap;
+    const separados = rs.clasificacion.map(p => p.nombre).join(' / ');
+    chequear('con G3 separado, cada grado tiene su podio',
+      separados === 'Mini/Midi G1 / Mini/Midi G2 / Intermediate/Large G1 / Intermediate/Large G3', separados);
+    chequear('y el XS G2 queda en Mini/Midi G2', de(rs, '45').podio === 'Mini/Midi G2', de(rs, '45').podio);
+    chequear('el ajuste es del evento: la otra cancha también lo ve',
+      (await snapshot('ring-2')).evento.separarG3 === true);
+    rs = (await accion('ring-1', 'separar_g3', mesaRes.token, { separar: false })).snap;
+    chequear('volver a juntarlos los deja como estaban',
+      rs.clasificacion.map(p => p.nombre).join(' / ') === nombres, rs.clasificacion.map(p => p.nombre).join(' / '));
 
     // Un perro de otro ring, y un ausente.
     const ajenoRes = (await snapshot('ring-2')).lista[0].id;

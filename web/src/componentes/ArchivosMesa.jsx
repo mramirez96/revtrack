@@ -79,6 +79,13 @@ export function DatosEvento({ snap, accion }) {
           Guardar nombre y fecha
         </BotonCarga>
       </div>
+      {/* Art. 34 del Reglamento Nacional: G2 y G3 corren unificados mientras no
+          haya al menos 10 duplas G3 de una misma altura. */}
+      <label className="orden-check" style={{ display: 'block', marginTop: 12 }}>
+        <input type="checkbox" checked={!!snap.evento.separarG3}
+               onChange={e => accion('separar_g3', { separar: e.target.checked })} /> G3 con podio propio
+        (si no, G2 y G3 van juntos en G2/G3)
+      </label>
     </section>
   );
 }
