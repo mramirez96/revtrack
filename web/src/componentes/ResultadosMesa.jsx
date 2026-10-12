@@ -110,31 +110,30 @@ function FormResultado({ perro, res, regla, separarG3, grande, textoBoton, onGua
 
   return (
     <div className={grande ? 'res-form grande' : 'res-form'}>
-      {/* Faltas y negativas arriba, el tiempo en su renglón: en el celular
-          entran los dos contadores lado a lado y el tiempo queda a lo ancho. */}
+      {/* Faltas y negativas arriba; abajo el tiempo con el botón al lado. En el
+          celular, al tocar el tiempo se abre el teclado y el navegador deja el
+          campo justo encima: si el botón estuviera debajo, quedaría tapado. */}
       <div className="res-campos">
         <Contador nombre="Faltas" valor={b.faltas} onChange={faltas => cambiar({ faltas })} />
         <Contador nombre="Negativas" valor={b.rehuses} onChange={rehuses => cambiar({ rehuses })} />
       </div>
-      <div className="res-campos">
+      <label className="orden-check res-elim">
+        <input type="checkbox" checked={b.eliminado} onChange={e => cambiar({ eliminado: e.target.checked })} /> Descalificado
+      </label>
+      <div className="res-campos res-envio">
         <label className="res-campo res-tiempo"><span>Tiempo (s)</span>
-          <input ref={tiempo} type="text" inputMode="decimal" autoComplete="off" placeholder="38,52"
+          <input ref={tiempo} type="text" inputMode="decimal" enterKeyHint="send" autoComplete="off" placeholder="38,52"
                  aria-label="Tiempo" value={b.tiempo}
                  onChange={e => cambiar({ tiempo: e.target.value })}
                  onKeyDown={e => { if (e.key === 'Enter') guardar(); }} />
         </label>
-      </div>
-      <label className="orden-check res-elim">
-        <input type="checkbox" checked={b.eliminado} onChange={e => cambiar({ eliminado: e.target.checked })} /> Descalificado
-      </label>
-      <p className="res-previa mono">{vistaPrevia(b, regla, perro, separarG3)}</p>
-      <div className="res-btns">
         <button className={grande ? 'mesa-btn' : 'btn'} onClick={guardar}
                 style={grande ? undefined : { background: 'var(--chalk)', color: 'var(--turf)' }}>
           {textoBoton}
         </button>
-        {extra}
       </div>
+      <p className="res-previa mono">{vistaPrevia(b, regla, perro, separarG3)}</p>
+      {extra && <div className="res-btns">{extra}</div>}
     </div>
   );
 }
