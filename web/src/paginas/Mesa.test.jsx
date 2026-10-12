@@ -214,6 +214,28 @@ describe('mesa', () => {
     expect(screen.getByLabelText('Velocidad Intermediate/Large')).toBeTruthy();
   });
 
+  it('en G2/G3 se ve qué TRS vale: el del más rápido + 18%, o el del juez si es menor', async () => {
+    const g2 = [
+      perro(1, '101', 'BRUNO', 'Guía Uno', 'Intermediate', 'G2', 'corrido', { tiempo: 35.2, faltas: 0, rehuses: 0, eliminado: false }),
+      perro(2, '102', 'CHISPA', 'Guía Dos', 'Large', 'G3', 'corrido', { tiempo: 44, faltas: 0, rehuses: 0, eliminado: false }),
+      perro(3, '103', 'NIEBLA', 'Guía Tres', 'Large', 'G2', 'en_pista')
+    ];
+    snap = armarSnapshot(g2, { pistas: [{ ...PISTAS[0], trs: {} }] });
+    montar();
+    const linea = await screen.findByText(/^G2\/G3: /);
+    expect(linea.textContent).toBe('G2/G3: TRS 42,00 s · más rápido 35,20 s + 18%');
+    fireEvent.click(screen.getByText('Ver (2 con resultado)'));
+    const c = screen.getByTestId('clasificacion');
+    expect(within(c).getByText('TRS 42,00 s · más rápido 35,20 s + 18%')).toBeTruthy();
+    // CHISPA (44 s, limpio) se pasa 2 s de ese TRS.
+    expect([...c.querySelectorAll('.cola-res')][1].textContent).toMatch(/^F: 2,00/);
+    cleanup();
+
+    snap = armarSnapshot(g2, { pistas: [{ ...PISTAS[0], trs: { trs: 40 } }] });
+    montar();
+    expect((await screen.findByText(/^G2\/G3: /)).textContent).toBe('G2/G3: TRS 40,00 s · el del juez (más rápido + 18%: 42,00 s)');
+  });
+
   it('largo y velocidad proponen el TRS al tocarlos; después se escribe encima sin que se recalcule', async () => {
     montar();
     fireEvent.change(await screen.findByLabelText('Largo'), { target: { value: '191' } });

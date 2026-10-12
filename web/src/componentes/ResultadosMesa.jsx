@@ -23,13 +23,17 @@ const nombrePodio = (i, evento) => i.podio || R.podioDe(i, { separarG3: !!evento
 
 // La penalización de lo que está tipeado, antes de guardar: el mismo cálculo
 // que el servidor (shared/resultados.mjs), así lo que se ve es lo que va a quedar.
-function vistaPrevia(b, regla) {
+// En G2/G3 el TRS puede bajar con este mismo perro si es el más rápido, pero a
+// él no lo afecta: su propio tiempo + 18% siempre le queda holgado.
+function vistaPrevia(b, regla, perro, separarG3) {
   const t = R.leerNumero(b.tiempo);
   if (!b.eliminado && t === null) return b.tiempo.trim() ? 'El tiempo no es un número.' : 'Falta el tiempo.';
   const calc = R.calcular({ tiempo: t, faltas: b.faltas, rehuses: b.rehuses, eliminado: b.eliminado }, regla);
   if (calc.eliminado) return `→ ${R.desglose(calc)} · No clasifica`;
   return `→ F: ${R.fmt(calc.total)} · ${calc.calif} · ${R.desglose(calc)} · ${
-    regla?.trs ? `TRS ${R.fmt(regla.trs)} s` : 'sin TRS cargado'}`;
+    regla?.trs ? `TRS ${R.fmt(regla.trs)} s`
+      : R.porcentajeTrs(R.gradoDePodio(perro.categoria, { separarG3 }).id) ? 'TRS: sale del más rápido'
+      : 'sin TRS cargado'}`;
 }
 
 /* ── estado compartido ───────────────────────────────────────────────── */
@@ -86,7 +90,7 @@ function Contador({ nombre, valor, onChange }) {
 // Lo tipeado vive acá adentro; quien lo usa le pone `key={perro.id}`, así cada
 // perro arranca con su propio borrador (o con lo que había quedado de un
 // guardado que falló).
-function FormResultado({ perro, res, regla, grande, textoBoton, onGuardar, extra, enfocar }) {
+function FormResultado({ perro, res, regla, separarG3, grande, textoBoton, onGuardar, extra, enfocar }) {
   const [b, setB] = useState(() => res.restaurar[perro.id] || borradorDe(perro));
   const tiempo = useRef(null);
   const cambiar = c => setB(x => ({ ...x, ...c }));
@@ -123,7 +127,7 @@ function FormResultado({ perro, res, regla, grande, textoBoton, onGuardar, extra
       <label className="orden-check res-elim">
         <input type="checkbox" checked={b.eliminado} onChange={e => cambiar({ eliminado: e.target.checked })} /> Descalificado
       </label>
-      <p className="res-previa mono">{vistaPrevia(b, regla)}</p>
+      <p className="res-previa mono">{vistaPrevia(b, regla, perro, separarG3)}</p>
       <div className="res-btns">
         <button className={grande ? 'mesa-btn' : 'btn'} onClick={guardar}
                 style={grande ? undefined : { background: 'var(--chalk)', color: 'var(--turf)' }}>
@@ -155,7 +159,7 @@ export function EnPistaMesa({ snap, res, accion }) {
         <span><span className="mesa-actual-nombre">{actual.perro}</span><br />
           <span className="mesa-actual-sub">{actual.guia}<Etiquetas i={actual} /> · {nombrePodio(actual, snap.evento)}</span></span>
       </div>
-      <FormResultado key={actual.id} perro={actual} res={res} regla={R.reglaDe(snap.trs, actual.altura)} grande enfocar
+      <FormResultado key={actual.id} perro={actual} res={res} regla={R.reglaDePerro(snap, actual)} separarG3={!!snap.evento?.separarG3} grande enfocar
                      textoBoton={otra ? 'Guardar resultado' : 'Guardar y largar el siguiente'}
                      onGuardar={b => res.guardar(actual, b, { avanzar: !otra })} />
     </>;
@@ -221,7 +225,7 @@ export function CorregirResultados({ snap, res }) {
             <span><span className="mesa-item-quien">{ed.perro}</span><br />
               <span className="mesa-item-sub">{ed.guia}<Etiquetas i={ed} /> · {nombrePodio(ed, snap.evento)}</span></span>
           </div>
-          <FormResultado key={ed.id} perro={ed} res={res} regla={R.reglaDe(snap.trs, ed.altura)} textoBoton="Guardar resultado"
+          <FormResultado key={ed.id} perro={ed} res={res} regla={R.reglaDePerro(snap, ed)} separarG3={!!snap.evento?.separarG3} textoBoton="Guardar resultado"
                          onGuardar={guardar}
                          extra={<>
                            {ed.resultado && (

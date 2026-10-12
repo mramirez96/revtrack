@@ -343,7 +343,7 @@ function Orden({ snap, clave }) {
               <span className="cola-nombre">{i.perro}</span><br />
               <span className="cola-sub">{i.guia}<Etiquetas i={i} /></span>
             </span>
-            {i.res ? <ResultadoCorto res={i.res} regla={R.reglaDe(snap.trs, i.altura)} /> : (
+            {i.res ? <ResultadoCorto res={i.res} regla={R.reglaDePerro(snap, i)} /> : (
               <span className="cola-eta mono">{marca
                 ? marca.nota
                 : snap.pista?.arrancada ? reloj(idx * snap.segPerro) : `${idx + 1}º`}</span>

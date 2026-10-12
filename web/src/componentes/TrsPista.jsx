@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as R from '../../../shared/resultados.mjs';
 import { fmtLibre } from '../lib/formato.js';
 import { BotonCarga } from './comunes.jsx';
+import { trsTexto } from './Clasificacion.jsx';
 
 // Los grupos de altura que corren esta pista, en el orden de la lista.
 function gruposDe(lista) {
@@ -12,6 +13,11 @@ function gruposDe(lista) {
   }
   return [...vistos.values()];
 }
+
+// Los podios G2/G3 de un grupo: ahí el TRS no es sólo el tipeado, depende de
+// quién vaya más rápido, y la mesa tiene que ver cuál está valiendo.
+const podiosConRapido = (snap, grupoId) =>
+  (snap.clasificacion || []).filter(p => p.grupo === grupoId && R.porcentajeTrs(p.grado));
 
 function desdeSnap(trsPista, grupos) {
   return {
@@ -70,8 +76,10 @@ export default function TrsPista({ snap, accion, mostrar }) {
     <section className="mesa-seccion">
       <p className="eyebrow">TRS · {snap.pista.nombre}</p>
       <p className="mesa-actual-sub" style={{ margin: '8px 0 6px' }}>
-        Uno por altura. Con largo y velocidad se calcula, como en la planilla; si el juez
-        da otro, tipealo encima. Cada segundo por encima del TRS suma un punto.
+        Uno por altura, para todos los grados. Con largo y velocidad se calcula, como en
+        la planilla; si el juez da otro, tipealo encima. En G2/G3 vale el menor entre éste
+        y el más rápido + 18% (G3 solo: + 15%), redondeado hacia arriba. Cada segundo por
+        encima del TRS suma un punto.
       </p>
       <div className="trs-fila">
         {campo('Largo', 'Largo', 'm', v.largo, cambiarLargo)}
@@ -83,6 +91,12 @@ export default function TrsPista({ snap, accion, mostrar }) {
             velocidad => cambiarGrupo(g.id, { velocidad }, true))}
           {campo('TRS', `TRS ${g.nombre}`, 's', v.grupos[g.id]?.trs ?? '',
             trs => cambiarGrupo(g.id, { trs }, false))}
+          {podiosConRapido(snap, g.id).map(p => (
+            <span key={p.id} className="trs-podio mono">
+              {p.categoria}: {p.regla?.trs ? trsTexto(p.regla)
+                : `sale del más rápido + ${R.porcentajeTrs(p.grado)}% (todavía nadie corrió)`}
+            </span>
+          ))}
         </div>
       ))}
       <div className="trs-fila">

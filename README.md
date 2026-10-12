@@ -118,9 +118,13 @@ real rows from them:
   **TRS**, added to the total — which is also why going over the TRS costs a clean
   run its *cero*. The third refusal eliminates. There is no TMR (maximum time): the
   club does not use one.
-- TRS = course length ÷ speed (191 m ÷ 4.5 m/s = 42.44 s), **one per round**: the
-  same number for every dog running it, even in an open where G1 and G2 run
-  together. It can also be typed in directly.
+- The judge's TRS = course length ÷ speed (191 m ÷ 4.5 m/s = 42.44 s), one per
+  height group (Mini/Midi, Intermediate/Large) with the same speed for every grade;
+  it can also be typed in directly. Iniciantes and G1 use it as is. **G2/G3** use
+  the lower of that and the fastest dog with the fewest course faults + 18% (+ 15%
+  for G3 when it has its own podium), rounded up to the second — Reglamento
+  Nacional 2026, Art. 33. That one moves as dogs run, so the podium stays
+  provisional until the last one.
 - Ranked by total penalty, then time. Exact ties share a placing.
 - Grading, same cut-offs as the club's spreadsheet: 0 *Cero Exc*, ≤5.99 *Exc*,
   ≤15.99 *MB*, ≤25.99 *B*, otherwise *No clasifica*.

@@ -747,8 +747,11 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     chequear('Small y XS comparten podio: el limpio le gana al de 1 falta aunque sea más lento',
       de(rs, '42').puesto === 1 && de(rs, '45').puesto === 2,
       JSON.stringify([de(rs, '42').puesto, de(rs, '45').puesto]));
-    chequear('sin TRS no hay faltas de tiempo, y se avisa', de(rs, '42').res.exceso === 0 && de(rs, '42').res.sinTrs === true,
-      JSON.stringify(de(rs, '42').res));
+    // Son G2: sin TRS del juez vale el del más rápido limpio + 18% (40 s → 47,2 → 48 s).
+    const reglaSM = rs.clasificacion.find(p => p.nombre === 'Mini/Midi G2/G3').regla;
+    chequear('en G2/G3, sin TRS del juez, vale el del más rápido limpio + 18%, redondeado',
+      reglaSM.trs === 48 && reglaSM.juez === null && reglaSM.masRapido.tiempo === 40 && de(rs, '42').res.sinTrs === false,
+      JSON.stringify(reglaSM));
 
     // TRS: uno para toda la pista (abajo, uno por grupo de altura).
     const trsMalo = await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, trs: 'cuarenta' });
@@ -833,6 +836,38 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       { id: 'q', altura: 'Large', categoria: 'G2', estado: 'corrido', resultado: { tiempo: 49.82, faltas: 0, rehuses: 0 } }
     ], { trs: 49.37 })[0].filas.map(f => f.id).join(',');
     chequear('planilla Regional 4: Perro D (0,45) queda arriba de Perro E (1 falta, 11 s más rápida)', ordenReg4 === 'q,z', ordenReg4);
+
+    // TRS de G2/G3 según el Reglamento Nacional 2026 (Art. 33-C-e y D-e).
+    {
+      const corrio = (id, categoria, tiempo, faltas = 0, extra = {}) =>
+        ({ id, altura: 'Large', categoria, estado: 'corrido', resultado: { tiempo, faltas, rehuses: 0, ...extra } });
+      const podio = (lista, trs = {}, opciones) => Resultados.clasificar(lista, trs, opciones)[0];
+      const p1 = podio([corrio('a', 'G2', 35.2), corrio('b', 'G2', 30, 1), corrio('c', 'G3', 44)]);
+      chequear('G2/G3: el más rápido limpio + 18%, hacia arriba (35,20 → 41,54 → 42)',
+        p1.regla.trs === 42 && p1.regla.masRapido.pct === 18 && p1.regla.masRapido.conFaltas === false, JSON.stringify(p1.regla));
+      chequear('el que tiene una falta no cuenta como más rápido aunque lo sea', p1.regla.masRapido.tiempo === 35.2);
+      const c = p1.filas.find(f => f.id === 'c').res;
+      chequear('y los demás se pasan de ese TRS: 44 s limpio → 2,00 Exc', c.total === 2 && c.calif === 'Exc', JSON.stringify(c));
+      const p2 = podio([corrio('a', 'G2', 35.2)], { largo: 160, grupos: { 'intermediate-large': { velocidad: 4, trs: 40 } } });
+      chequear('si el del juez es menor, manda el del juez', p2.regla.trs === 40 && p2.regla.juez === 40 && p2.regla.masRapido.trs === 42,
+        JSON.stringify(p2.regla));
+      const p3 = podio([corrio('a', 'G2', 30), corrio('b', 'G2', 60)], { trs: 45 });
+      chequear('si el del más rápido es menor, manda ése', p3.regla.trs === 36, JSON.stringify(p3.regla));
+      const p4 = podio([corrio('a', 'G3', 35.2)], {}, { separarG3: true });
+      chequear('G3 con podio propio: + 15% (35,20 → 40,48 → 41)', p4.regla.trs === 41 && p4.regla.masRapido.pct === 15,
+        JSON.stringify(p4.regla));
+      const p5 = podio([corrio('a', 'G2', 35.2)], {}, { separarG3: true });
+      chequear('G2 con podio propio sigue con + 18%', p5.regla.trs === 42, JSON.stringify(p5.regla));
+      const p6 = podio([corrio('a', 'G2', 30, 1), corrio('b', 'G2', 28, 2), corrio('c', 'G2', 20, 0, { eliminado: true })]);
+      chequear('nadie limpio: el más rápido de los de menos faltas (30 s, 1 falta → 36), sin contar eliminados',
+        p6.regla.trs === 36 && p6.regla.masRapido.conFaltas === true, JSON.stringify(p6.regla));
+      chequear('un número justo no sube un segundo de más (50 s + 18% = 59)', Resultados.trsDelMasRapido(50, 18) === 59);
+      const p7 = podio([corrio('a', 'G1', 35.2)]);
+      chequear('G1 no usa el más rápido: sin TRS del juez no hay TRS', p7.regla === null && p7.filas[0].res.sinTrs === true,
+        JSON.stringify(p7.regla));
+      const p8 = podio([{ id: 'a', altura: 'Large', categoria: 'G2', estado: 'pendiente', resultado: null }], { trs: 45 });
+      chequear('G2/G3 sin nadie corrido: vale el del juez', p8.regla.trs === 45 && !p8.regla.masRapido, JSON.stringify(p8.regla));
+    }
     chequear('cortes de calificación de la planilla',
       ['Exc', 'MB', 'MB', 'B', 'B', 'No clasifica'].join() ===
       [5.99, 6, 15.99, 16, 25.99, 26].map(Resultados.calificacion).join(),
