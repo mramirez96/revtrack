@@ -122,7 +122,7 @@ real rows from them:
   height group (Mini/Midi, Intermediate/Large) with the same speed for every grade;
   it can also be typed in directly. Iniciantes and G1 use it as is. **G2/G3** use
   the lower of that and the fastest dog with the fewest course faults + 18% (+ 15%
-  for G3 when it has its own podium), rounded up to the second — Reglamento
+  for G3 when it has its own podium), not rounded, as the Nacional 2026 sheets do — Reglamento
   Nacional 2026, Art. 33. That one moves as dogs run, so the podium stays
   provisional until the last one.
 - Ranked by total penalty, then time. Exact ties share a placing.

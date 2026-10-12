@@ -11,7 +11,8 @@
 //   - TRS del juez = largo ÷ velocidad, uno por grupo de altura (la misma
 //     velocidad para todos los grados), o tipeado a mano. Iniciantes y G1 usan
 //     ése. G2 y G3 usan el menor entre ése y el del más rápido + 18% (G2, y
-//     G2/G3 unificado) o + 15% (G3), redondeado hacia arriba al segundo
+//     G2/G3 unificado) o + 15% (G3), sin redondear, como en las planillas del
+//     Nacional 2026
 //     (Reglamento Nacional 2026, Art. 33). Ver reglaDePodio.
 //   - La tercera negativa elimina. No hay TMR (tiempo máximo): el club no lo usa,
 //     por más que se pase del TRS el perro no queda eliminado, sólo suma.
@@ -190,10 +191,12 @@ export function porcentajeTrs(gradoId) {
   return null;
 }
 
-// El más rápido + el porcentaje, redondeado hacia arriba al segundo (como
-// FCI): 35,20 s + 18% = 41,54 → 42 s.
+// El más rápido + el porcentaje, sin redondear: así lo hacen las planillas
+// del Nacional 2026 (Jumping final Small/Medium: 42,21 s + 18% = 49,8078 s).
+// FCI redondea hacia arriba al segundo, pero eso es para sus eventos
+// internacionales.
 export function trsDelMasRapido(tiempo, pct) {
-  return Math.ceil(limpio(tiempo * (100 + pct) / 100));
+  return limpio(tiempo * (100 + pct) / 100);
 }
 
 // La regla de un podio: la del juez para su grupo de altura y, en G2/G3, el

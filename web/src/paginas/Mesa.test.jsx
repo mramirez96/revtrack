@@ -223,17 +223,17 @@ describe('mesa', () => {
     snap = armarSnapshot(g2, { pistas: [{ ...PISTAS[0], trs: {} }] });
     montar();
     const linea = await screen.findByText(/^G2\/G3: /);
-    expect(linea.textContent).toBe('G2/G3: TRS 42,00 s · más rápido 35,20 s + 18%');
+    expect(linea.textContent).toBe('G2/G3: TRS 41,54 s · más rápido 35,20 s + 18%');
     fireEvent.click(screen.getByText('Ver (2 con resultado)'));
     const c = screen.getByTestId('clasificacion');
-    expect(within(c).getByText('TRS 42,00 s · más rápido 35,20 s + 18%')).toBeTruthy();
-    // CHISPA (44 s, limpio) se pasa 2 s de ese TRS.
-    expect([...c.querySelectorAll('.cola-res')][1].textContent).toMatch(/^F: 2,00/);
+    expect(within(c).getByText('TRS 41,54 s · más rápido 35,20 s + 18%')).toBeTruthy();
+    // CHISPA (44 s, limpio) se pasa 2,46 s de ese TRS.
+    expect([...c.querySelectorAll('.cola-res')][1].textContent).toMatch(/^F: 2,46/);
     cleanup();
 
     snap = armarSnapshot(g2, { pistas: [{ ...PISTAS[0], trs: { trs: 40 } }] });
     montar();
-    expect((await screen.findByText(/^G2\/G3: /)).textContent).toBe('G2/G3: TRS 40,00 s · el del juez (más rápido + 18%: 42,00 s)');
+    expect((await screen.findByText(/^G2\/G3: /)).textContent).toBe('G2/G3: TRS 40,00 s · el del juez (más rápido + 18%: 41,54 s)');
   });
 
   it('largo y velocidad proponen el TRS al tocarlos; después se escribe encima sin que se recalcule', async () => {

@@ -78,7 +78,7 @@ export default function TrsPista({ snap, accion, mostrar }) {
       <p className="mesa-actual-sub" style={{ margin: '8px 0 6px' }}>
         Uno por altura, para todos los grados. Con largo y velocidad se calcula, como en
         la planilla; si el juez da otro, tipealo encima. En G2/G3 vale el menor entre éste
-        y el más rápido + 18% (G3 solo: + 15%), redondeado hacia arriba. Cada segundo por
+        y el más rápido + 18% (G3 solo: + 15%), sin redondear. Cada segundo por
         encima del TRS suma un punto.
       </p>
       <div className="trs-fila">
