@@ -663,7 +663,7 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     /* ── 7a. alturas con el nombre que usa el club ───────────────────── */
     console.log('\n7a. Mini / Midi / Intermediate/Large');
     {
-      // Como vienen en el orden de salida de un regional: Mini y Midi, y en G0
+      // Como vienen en el orden de salida de un regional: Mini y Midi, y en Iniciantes
       // Intermediate/Large en un solo bloque. Desordenado a propósito.
       const { state } = dominio.sembrar(['ring,pista,categoria,altura,dorsal,guia,perro',
         'R,G0,G0,Intermediate/Large,,Ana,PERRO1', 'R,G0,G0,Midi,,Bea,PERRO2',
@@ -672,14 +672,38 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       chequear('Mini y Midi se ordenan como Small y Medium, no al final',
         orden === 'XS,Mini,Midi,Intermediate/Large', orden);
       const grupos = ['Mini', 'Midi', 'Intermediate/Large'].map(a => Resultados.grupoDeAltura(a).nombre).join(',');
-      chequear('y caen en sus podios de siempre', grupos === 'Small/Midi,Small/Midi,Intermediate/Large', grupos);
+      chequear('y caen en sus podios de siempre', grupos === 'Mini/Midi,Mini/Midi,Intermediate/Large', grupos);
+      chequear('un bloque "Mini/Midi" también cae en Mini/Midi',
+        Resultados.grupoDeAltura('Mini/Midi').id === 'small-midi', Resultados.grupoDeAltura('Mini/Midi').id);
+    }
+
+    /* ── 7a'. Iniciantes (el viejo G0) ───────────────────────────────── */
+    console.log('\n7a\'. Iniciantes');
+    {
+      const nombres = ['G0', 'Iniciantes', 'iniciante', 'INI', 'Grado 0'].map(c => Resultados.gradoDe(c).nombre);
+      chequear('G0 y sus variantes se leen como Iniciantes',
+        nombres.every(n => n === 'Iniciantes'), nombres.join(','));
+      chequear('un grado desconocido queda con su nombre', Resultados.gradoDe('Open').nombre === 'Open');
+      // Mezcla de los dos nombres: es un solo podio, y va antes que G1 (por
+      // texto, "Iniciantes" quedaría después de "G3").
+      const bloques = Resultados.clasificar([
+        { id: 'a', altura: 'Small', categoria: 'G3', estado: 'corrido', resultado: { tiempo: 30, faltas: 0, rehuses: 0 } },
+        { id: 'b', altura: 'Small', categoria: 'Iniciantes', estado: 'corrido', resultado: { tiempo: 31, faltas: 0, rehuses: 0 } },
+        { id: 'c', altura: 'Small', categoria: 'G0', estado: 'corrido', resultado: { tiempo: 29, faltas: 0, rehuses: 0 } },
+        { id: 'd', altura: 'Small', categoria: 'G1', estado: 'corrido', resultado: { tiempo: 32, faltas: 0, rehuses: 0 } }
+      ], {});
+      const orden = bloques.map(p => p.nombre).join(' / ');
+      chequear('Iniciantes va primero y junta G0 con Iniciantes',
+        orden === 'Mini/Midi Iniciantes / Mini/Midi G1 / Mini/Midi G3', orden);
+      chequear('el G0 y el Iniciantes compiten entre ellos',
+        bloques[0].filas.map(f => f.id).join(',') === 'c,b', bloques[0].filas.map(f => f.id).join(','));
     }
 
     /* ── 7b. resultados: tiempo, faltas, rehúses, TRS y clasificación ──── */
     console.log('\n7b. Resultados y clasificación');
     await sembrarFixture(FIXTURE);
     // Orden sembrado: 45 XS G2, 42 Small G2, 44 Medium G1, 46 Intermediate G3,
-    // 41 Large G1, 43 Large G3. Podios: Small/Midi junta XS/Small/Medium;
+    // 41 Large G1, 43 Large G3. Podios: Mini/Midi junta XS/Small/Medium;
     // Intermediate/Large junta esas dos; cada uno abierto por grado.
     const mesaRes = await entrar('ring-1', PIN);
     const PISTA = 'ring-1--jumping-1';
@@ -704,7 +728,7 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     chequear('el que está en pista ya puede tener resultado; la coma decimal se entiende',
       de(rs, '45').resultado?.tiempo === 38.52 && de(rs, '45').res?.total === 5,
       JSON.stringify(de(rs, '45')));
-    chequear('XS cae en el podio Small/Midi de su grado', de(rs, '45').podio === 'Small/Midi G2', de(rs, '45').podio);
+    chequear('XS cae en el podio Mini/Midi de su grado', de(rs, '45').podio === 'Mini/Midi G2', de(rs, '45').podio);
     chequear('con un solo resultado es 1º', de(rs, '45').puesto === 1, String(de(rs, '45').puesto));
 
     rs = (await accion('ring-1', 'siguiente', mesaRes.token)).snap;   // 45 corrido, 42 a pista
@@ -750,7 +774,7 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       Math.abs(de(rs, '45').res.exceso - 2.52) < 1e-6 && Math.abs(de(rs, '45').res.total - 7.52) < 1e-6,
       JSON.stringify(de(rs, '45').res));
 
-    // Un TRS por grupo de altura: Small/Midi e Intermediate/Large a velocidades distintas.
+    // Un TRS por grupo de altura: Mini/Midi e Intermediate/Large a velocidades distintas.
     const grupoMalo = await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, grupos: { 'Small Midi!': { trs: 40 } } });
     chequear('un grupo de altura inválido se rechaza', /grupos de altura/.test(String(grupoMalo.error)), JSON.stringify(grupoMalo));
     const velSinLargo = await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, grupos: { 'small-midi': { velocidad: 4 } } });
@@ -759,10 +783,10 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       pistaId: PISTA, largo: '191',
       grupos: { 'small-midi': { velocidad: '4', trs: '' }, 'intermediate-large': { velocidad: '4,5', trs: '40' } }
     })).snap;
-    chequear('por grupo: Small/Midi sale de la cuenta (191 ÷ 4 = 47,75), Intermediate/Large toma el tipeado',
+    chequear('por grupo: Mini/Midi sale de la cuenta (191 ÷ 4 = 47,75), Intermediate/Large toma el tipeado',
       rs.trs.largo === 191 && rs.trs.grupos['small-midi'].trs === 47.75 && rs.trs.grupos['intermediate-large'].trs === 40,
       JSON.stringify(rs.trs));
-    chequear('el XS usa el TRS de Small/Midi: 38,52 s queda dentro', de(rs, '45').res.exceso === 0, JSON.stringify(de(rs, '45').res));
+    chequear('el XS usa el TRS de Mini/Midi: 38,52 s queda dentro', de(rs, '45').res.exceso === 0, JSON.stringify(de(rs, '45').res));
     const podiosSM = rs.clasificacion.find(p => p.grupo === 'small-midi');
     chequear('cada podio dice su TRS', podiosSM.regla.trs === 47.75 && podiosSM.regla.largo === 191, JSON.stringify(podiosSM.regla));
     const porGrupo = Resultados.clasificar([
@@ -827,9 +851,9 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
       de(rs, '42').resultado === null && de(rs, '42').puesto === undefined, JSON.stringify(de(rs, '42')));
 
     const nombres = rs.clasificacion.map(p => p.nombre).join(' / ');
-    chequear('podios en orden: Small/Midi antes que Intermediate/Large, y por grado',
-      nombres === 'Small/Midi G1 / Small/Midi G2 / Intermediate/Large G1 / Intermediate/Large G3', nombres);
-    const smG2 = rs.clasificacion.find(p => p.nombre === 'Small/Midi G2');
+    chequear('podios en orden: Mini/Midi antes que Intermediate/Large, y por grado',
+      nombres === 'Mini/Midi G1 / Mini/Midi G2 / Intermediate/Large G1 / Intermediate/Large G3', nombres);
+    const smG2 = rs.clasificacion.find(p => p.nombre === 'Mini/Midi G2');
     chequear('el podio cuenta los que faltan cargar (clasificación provisoria)',
       smG2.clasificados === 1 && smG2.faltan === 1, JSON.stringify(smG2));
 

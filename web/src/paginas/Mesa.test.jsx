@@ -62,7 +62,7 @@ describe('mesa', () => {
     expect(t.querySelector('.dorsal').textContent).toBe('102');
     expect(t.querySelector('.mesa-actual-sub').textContent).toMatch(/Guía Dos/);
     expect(within(t).getByText('Small')).toBeTruthy();
-    expect(t.textContent).toMatch(/Small\/Midi G1/);
+    expect(t.textContent).toMatch(/Mini\/Midi G1/);
     expect(within(t).getByLabelText('Tiempo')).toBeTruthy();
     expect(within(t).getByLabelText('Sumar negativas')).toBeTruthy();
     expect(within(t).getByText('Guardar y largar el siguiente')).toBeTruthy();
@@ -189,7 +189,7 @@ describe('mesa', () => {
   it('lo cargado se lista con penalización, calificación y puesto', async () => {
     snap = armarSnapshot(base({ tiempo: 41.5, faltas: 1, rehuses: 0, eliminado: false }), { pistas: PISTAS });
     montar();
-    expect(await screen.findByText(/F: 6,50 · 41,50 s · MB · 1º en Small\/Midi G1/)).toBeTruthy();
+    expect(await screen.findByText(/F: 6,50 · 41,50 s · MB · 1º en Mini\/Midi G1/)).toBeTruthy();
   });
 
   it('la clasificación, la misma que la de los corredores, se puede abrir desde la mesa', async () => {
@@ -197,7 +197,7 @@ describe('mesa', () => {
     montar();
     fireEvent.click(await screen.findByText('Ver (1 con resultado)'));
     const c = screen.getByTestId('clasificacion');
-    expect(within(c).getByText('Small/Midi G1')).toBeTruthy();
+    expect(within(c).getByText('Mini/Midi G1')).toBeTruthy();
     expect(within(c).getByText('BRUNO')).toBeTruthy();
     expect(c.querySelector('.cola-res').textContent).toBe('F: 6,5041,50 s');
     fireEvent.click(screen.getByText('Ocultar'));
@@ -207,23 +207,23 @@ describe('mesa', () => {
   it('un TRS por altura, con el largo compartido', async () => {
     montar();
     // El TRS de antes (uno para todos) aparece en los dos grupos.
-    expect((await screen.findByLabelText('TRS Small/Midi')).value).toBe('40,00');
+    expect((await screen.findByLabelText('TRS Mini/Midi')).value).toBe('40,00');
     expect(screen.getByLabelText('TRS Intermediate/Large').value).toBe('40,00');
     expect(screen.getAllByLabelText('Largo')).toHaveLength(1);
-    expect(screen.getByLabelText('Velocidad Small/Midi')).toBeTruthy();
+    expect(screen.getByLabelText('Velocidad Mini/Midi')).toBeTruthy();
     expect(screen.getByLabelText('Velocidad Intermediate/Large')).toBeTruthy();
   });
 
   it('largo y velocidad proponen el TRS al tocarlos; después se escribe encima sin que se recalcule', async () => {
     montar();
     fireEvent.change(await screen.findByLabelText('Largo'), { target: { value: '191' } });
-    fireEvent.change(screen.getByLabelText('Velocidad Small/Midi'), { target: { value: '4,5' } });
-    expect(screen.getByLabelText('TRS Small/Midi').value).toBe('42,44');
+    fireEvent.change(screen.getByLabelText('Velocidad Mini/Midi'), { target: { value: '4,5' } });
+    expect(screen.getByLabelText('TRS Mini/Midi').value).toBe('42,44');
     // El otro grupo no tiene velocidad: queda como estaba.
     expect(screen.getByLabelText('TRS Intermediate/Large').value).toBe('40,00');
 
-    fireEvent.change(screen.getByLabelText('TRS Small/Midi'), { target: { value: '45' } });
-    expect(screen.getByLabelText('TRS Small/Midi').value).toBe('45');
+    fireEvent.change(screen.getByLabelText('TRS Mini/Midi'), { target: { value: '45' } });
+    expect(screen.getByLabelText('TRS Mini/Midi').value).toBe('45');
     expect(screen.queryByText(/Ajustado a mano/)).toBeNull();
 
     fireEvent.click(screen.getByText('Guardar TRS'));

@@ -14,19 +14,22 @@
 //     por más que se pase del TRS el perro no queda eliminado, sólo suma.
 //   - Se clasifica por menor penalización total y, a igualdad, menor tiempo.
 //   - Calificación por total: Cero Exc / Exc / MB / B / No clasifica.
-//   - Los podios juntan alturas: XS/Small/Midi corren por uno, Intermediate/
-//     Large por otro, y cada uno se abre por grado (G0 incluido).
+//   - Los podios juntan alturas: XS/Mini/Midi corren por uno, Intermediate/
+//     Large por otro, y cada uno se abre por grado (Iniciantes incluido).
 
 export const PEN_FALTA = 5;
 export const PEN_REHUSE = 5;
 export const REHUSES_ELIMINAN = 3;
 
-// Grupo de podio de cada altura. Incluye cómo las llaman en las planillas del
-// club: "Mini" es Small, y en G0 "Intermediate/Large" puede venir como un
-// solo bloque.
+// Grupo de podio de cada altura. El reglamento dice Small/Medium; acá se le
+// dice Mini/Midi, y así se muestra. Incluye cómo las llaman en las planillas
+// del club: "Mini" es Small, y en Iniciantes "Intermediate/Large" puede venir
+// como un solo bloque. El id queda 'small-midi' porque es la clave del TRS
+// guardado en cada pista.
 export const GRUPOS = [
-  { id: 'small-midi', nombre: 'Small/Midi',
-    alturas: ['xs', 'x-small', 'toy', 'small', 's', 'mini', 'medium', 'midi', 'm', 'small-midi', 'small-medium'] },
+  { id: 'small-midi', nombre: 'Mini/Midi',
+    alturas: ['xs', 'x-small', 'toy', 'small', 's', 'mini', 'medium', 'midi', 'm',
+      'small-midi', 'small-medium', 'mini-midi'] },
   { id: 'intermediate-large', nombre: 'Intermediate/Large',
     alturas: ['intermediate', 'inter', 'i', 'large', 'l', 'intermediate-large'] }
 ];
@@ -89,17 +92,37 @@ export function calcular(res, regla) {
   };
 }
 
-const grados = (a, b) => String(a || '').localeCompare(String(b || ''), 'es', { numeric: true });
+// Los grados del reglamento, en orden. Desde la v1.1 del Reglamento Nacional
+// (2026) el G0 se llama Iniciantes: se acepta cualquiera de los dos nombres y
+// se muestra el nuevo.
+const GRADOS = [
+  { id: 'iniciantes', nombre: 'Iniciantes',
+    alias: ['iniciantes', 'iniciante', 'ini', 'g0', 'grado-0', 'gr0', '0'] },
+  { id: 'g1', nombre: 'G1', alias: ['g1', 'grado-1', 'gr1', '1'] },
+  { id: 'g2', nombre: 'G2', alias: ['g2', 'grado-2', 'gr2', '2'] },
+  { id: 'g3', nombre: 'G3', alias: ['g3', 'grado-3', 'gr3', '3'] }
+];
+
+// El grado de una inscripción: { id, nombre, rango }. Uno que no está en la
+// lista (un "Open", "G2/G3") queda con su nombre, después de los conocidos.
+export function gradoDe(categoria) {
+  const c = clave(categoria);
+  const i = GRADOS.findIndex(g => g.alias.includes(c));
+  if (i >= 0) return { id: GRADOS[i].id, nombre: GRADOS[i].nombre, rango: i };
+  return c ? { id: c, nombre: String(categoria).trim(), rango: GRADOS.length }
+    : { id: 'sin-grado', nombre: '', rango: GRADOS.length + 1 };
+}
 
 // El podio de una inscripción: grupo de altura × grado.
 export function podioDe(i) {
   const g = grupoDeAltura(i.altura);
-  const cat = String(i.categoria || '').trim();
+  const gr = gradoDe(i.categoria);
   return {
-    id: `${g.id}--${clave(cat) || 'sin-grado'}`,
+    id: `${g.id}--${gr.id}`,
     grupo: g.id,
-    categoria: cat,
-    nombre: [g.nombre, cat].filter(Boolean).join(' ')
+    categoria: gr.nombre,
+    rangoGrado: gr.rango,
+    nombre: [g.nombre, gr.nombre].filter(Boolean).join(' ')
   };
 }
 
@@ -118,7 +141,8 @@ export function reglaDeGrupo(trsPista, grupoId) {
 export const reglaDe = (trsPista, altura) => reglaDeGrupo(trsPista, grupoDeAltura(altura).id);
 
 const ordenPodios = (a, b) => rangoGrupo(a.grupo) - rangoGrupo(b.grupo) ||
-  a.grupo.localeCompare(b.grupo) || grados(a.categoria, b.categoria);
+  a.grupo.localeCompare(b.grupo) || a.rangoGrado - b.rangoGrado ||
+  a.categoria.localeCompare(b.categoria, 'es', { numeric: true });
 
 // TRS = largo ÷ velocidad, como en la planilla (191 m ÷ 4,5 m/s = 42,44 s).
 export function trsDe(largo, velocidad) {

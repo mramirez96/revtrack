@@ -19,7 +19,7 @@ export function ResultadoCorto({ res, regla }) {
 }
 
 // "TRS 42,44 s · 191 m a 4,5 m/s": de dónde salió, para quien quiera hacer la
-// cuenta. Va en cada podio: Small/Midi e Intermediate/Large pueden tener TRS distintos.
+// cuenta. Va en cada podio: Mini/Midi e Intermediate/Large pueden tener TRS distintos.
 function trsTexto(r) {
   if (!r?.trs) return 'sin TRS';
   return `TRS ${R.fmt(r.trs)} s${r.largo && r.velocidad ? ` · ${fmtLibre(r.largo)} m a ${fmtLibre(r.velocidad)} m/s` : ''}`;
