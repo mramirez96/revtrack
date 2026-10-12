@@ -435,15 +435,33 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 .res-form.grande { margin-top: 16px; }
 .res-form.grande .res-campos { gap: 14px 22px; }
 .res-form.grande .res-campo input { width: 150px; font-size: 30px; padding: 12px 14px; }
-/* El tiempo, solo en su renglón, toma el ancho. */
-.res-tiempo { flex: 1 1 100%; }
-.res-tiempo input, .res-form.grande .res-tiempo input { width: 100%; max-width: 320px; box-sizing: border-box; }
+/* El tiempo y el botón de guardar comparten renglón, a la misma altura: con el
+   teclado abierto, lo que queda a la vista es este renglón entero. */
+.res-envio { flex-wrap: nowrap; align-items: stretch; }
+.res-tiempo { flex: 0 1 180px; min-width: 0; }
+.res-tiempo input, .res-form.grande .res-tiempo input { width: 100%; box-sizing: border-box; }
+.res-envio > button { flex: 1 1 0; min-width: 0; align-self: flex-end; }
+.res-form.grande .res-envio .mesa-btn {
+  font-size: 18px; line-height: 1.15; padding: 8px 12px; min-height: 64px;
+}
+.res-form.grande .res-tiempo input { font-size: 28px; padding: 11px 12px; }
 .res-form.grande .iconbtn { width: 56px; height: 56px; font-size: 24px; }
 .res-form.grande .res-cont b { font-size: 28px; min-width: 30px; }
 .res-form.grande .res-elim { font-size: 15px; }
 .res-form.grande .res-previa { font-size: 15px; }
-.res-form.grande .res-btns { display: block; }
-.res-form.grande .mesa-btn { width: 100%; }
+
+/* En el celular la tarjeta se compacta: el dorsal no necesita media pantalla,
+   y así perro, faltas, tiempo y botón entran juntos sobre el teclado. */
+@media (max-width: 600px) {
+  .mesa-actual { padding: 10px 0 14px; }
+  .mesa-actual .dorsal { font-size: clamp(40px, 12vw, 56px); }
+  .mesa-actual-nombre { font-size: 19px; }
+  .res-form.grande { margin-top: 10px; }
+  .res-form.grande .res-campos { margin: 10px 0 8px; gap: 10px 18px; }
+  .res-form.grande .iconbtn { width: 50px; height: 50px; }
+  .res-elim { margin: 2px 0 4px; }
+  .res-previa, .res-form.grande .res-previa { font-size: 13px; margin: 6px 0 8px; }
+}
 
 /* "Siguiente sin resultado": a mano, pero en segundo plano. */
 .mesa-secundarios { display: grid; gap: 10px; margin: 12px 0 4px; }
