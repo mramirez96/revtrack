@@ -19,7 +19,7 @@ export function ResultadoCorto({ res, regla }) {
 }
 
 // De dónde salió el TRS, para quien quiera hacer la cuenta: "TRS 42,44 s ·
-// 191 m a 4,5 m/s", o en G2/G3 "TRS 42,00 s · más rápido 35,20 s + 18%". Si
+// 191 m a 4,5 m/s", o en G2/G3 "TRS 41,54 s · más rápido 35,20 s + 18%". Si
 // en G2/G3 manda el del juez, se dice cuánto daba el del más rápido. Va en
 // cada podio: cada uno puede tener el suyo.
 export function trsTexto(r) {
