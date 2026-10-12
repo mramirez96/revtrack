@@ -8,11 +8,11 @@ export const perro = (n, dorsal, nombre, guia, altura, categoria, est, resultado
   ({ id: `i${n}`, pistaId, orden: n, dorsal, guia, perro: nombre, raza: '', altura, categoria, estado: est, resultado });
 
 // pistas: [{ id, nombre, estado, trs }] — la primera es la que se pide.
-export function armarSnapshot(inscripciones, { pistas, pistaId, trs = {} } = {}) {
+export function armarSnapshot(inscripciones, { pistas, pistaId, trs = {}, evento = {} } = {}) {
   const ps = (pistas || [{ id: 'p1', nombre: 'Jumping 1', estado: 'en_curso', trs }])
     .map((p, n) => ({ ringId: 'ring-1', orden: n + 1, segPerro: 38, marcas: [], trs: {}, ...p }));
   return estado.snapshot({
-    evento: { nombre: 'Winter Open', fecha: '2026-07-30' },
+    evento: { nombre: 'Winter Open', fecha: '2026-07-30', ...evento },
     rings: [{ id: 'ring-1', nombre: 'Ring 1' }],
     pistas: ps,
     inscripciones

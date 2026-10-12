@@ -281,7 +281,8 @@ function MiResultado({ mio, snap }) {
     <div className="cuenta">
       <span className="dorsal cuenta-n">{mio.puesto ? `${mio.puesto}º` : 'DESC'}</span>
       <span className="cuenta-txt">{mio.puesto ? `de ${podio.clasificados} en ${mio.podio}` : `Descalificado en ${mio.podio}`}
-        <br /><span className="cuenta-sub">{R.resumenCorto(mio.res)} · {R.desglose(mio.res)}</span>
+        <br /><span className="cuenta-sub">{R.resumenCorto(mio.res)} · {R.desglose(mio.res)}
+          {mio.puntos !== undefined && ` · ${mio.puntos} ${mio.puntos === 1 ? 'punto' : 'puntos'} de ranking`}</span>
       </span>
     </div>
     {podio?.faltan > 0 && (

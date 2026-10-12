@@ -103,8 +103,25 @@ describe('vista del corredor', () => {
     expect(c.textContent).toMatch(/Intermediate\/Large G1/);   // Large va con Intermediate
     expect(c.textContent).toMatch(/sin TRS/);
     expect(c.querySelector('.etiq.calif.cero').textContent).toBe('Cero Exc');
-    expect(c.textContent).not.toMatch(/Small\/Midi G2/);       // podio sin resultados: no aparece
+    expect(c.textContent).not.toMatch(/Mini\/Midi G2/);        // podio sin resultados: no aparece
     expect(localStorage.getItem('vista')).toBe('clasif');
+  });
+
+  it('en una fecha de ranking, G2/G3 muestra puntos; G1 no', async () => {
+    const conLuna = lista({ tiempo: 38.2, faltas: 0, rehuses: 0, eliminado: false }).map(i =>
+      i.dorsal === '47' ? { ...i, estado: 'corrido', resultado: { tiempo: 40, faltas: 1, rehuses: 0, eliminado: false } } : i);
+    montar(armarSnapshot(conLuna, { pistas: [{ ...PISTA, trs: { trs: 45 } }], evento: { ranking: true } }));
+    // Luna (la que mira, G3): 1º en Intermediate/Large G2/G3 con Exc → 21 puntos.
+    expect((await screen.findByTestId('turno')).textContent).toMatch(/21 puntos de ranking/);
+    fireEvent.click(screen.getByText('Clasificación'));
+    const c = screen.getByTestId('clasificacion');
+    expect(within(c).getByText('Luna').closest('li').querySelector('.etiq.pts').textContent).toBe('21 pts');
+    expect(within(c).getByText('Kira').closest('li').querySelector('.etiq.pts')).toBeNull();
+    cleanup();
+
+    // La misma pista en una fecha independiente: sin puntos.
+    montar(armarSnapshot(conLuna, { pistas: [{ ...PISTA, trs: { trs: 45 } }] }));
+    expect((await screen.findByTestId('turno')).textContent).not.toMatch(/puntos/);
   });
 
   it('con largo cargado muestra la velocidad; el descalificado dice DESC', async () => {
