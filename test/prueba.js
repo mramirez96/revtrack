@@ -640,6 +640,37 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     const trasR = await resumen();
     chequear('la competencia nueva sobrevive al reinicio', trasR.rings[0].pistas.length === 2, JSON.stringify(trasR.rings[0].pistas.map(p => p.nombre)));
 
+    /* ── 6g2. combinados: de a pares, opcionales ──────────────────────── */
+    console.log('\n6g2. Combinados');
+    {
+      const mesaC = await entrar(ringN, PIN);
+      const [ag, fin] = trasR.rings[0].pistas.map(p => p.id);
+      let sc = await snapshot(ringN);
+      chequear('de entrada ninguna pista combina', sc.combinado === null && sc.pistas.every(p => !p.combinaCon),
+        JSON.stringify(sc.pistas));
+      const consigo = await accion(ringN, 'combinar', mesaC.token, { pistaId: ag, con: ag });
+      chequear('una pista no combina consigo misma', !!consigo.error, JSON.stringify(consigo));
+      const ajena = await accion(ringN, 'combinar', mesaC.token, { pistaId: ag, con: 'otro-ring--x' });
+      chequear('no combina con una pista de otra cancha', !!ajena.error, JSON.stringify(ajena));
+      sc = (await accion(ringN, 'combinar', mesaC.token, { pistaId: ag, con: fin })).snap;
+      chequear('se arma el par, y las dos se apuntan',
+        sc.pistas.find(p => p.id === ag).combinaCon === fin && sc.pistas.find(p => p.id === fin).combinaCon === ag,
+        JSON.stringify(sc.pistas));
+      chequear('el snapshot trae el combinado, con las pistas en el orden en que se corren',
+        sc.combinado?.pistas.map(p => p.nombre).join(' + ') === 'Agility 1 + Final', JSON.stringify(sc.combinado?.pistas));
+      chequear('sin nadie corrido, todos quedan como faltan',
+        sc.combinado.clasificacion.reduce((n, p) => n + p.faltan, 0) === 2 &&
+        sc.combinado.clasificacion.every(p => !p.filas.length), JSON.stringify(sc.combinado.clasificacion));
+      const desdeLaOtra = await snapshot(ringN, fin);
+      chequear('desde la otra pista se ve el mismo combinado', desdeLaOtra.combinado?.pistas[1].id === fin);
+      sc = (await accion(ringN, 'deshacer', mesaC.token)).snap;
+      chequear('deshacer desarma el combinado', sc.combinado === null && sc.pistas.every(p => !p.combinaCon),
+        JSON.stringify(sc.pistas));
+      sc = (await accion(ringN, 'combinar', mesaC.token, { pistaId: fin, con: ag })).snap;
+      sc = (await accion(ringN, 'combinar', mesaC.token, { pistaId: ag, con: null })).snap;
+      chequear('"no combina" suelta a las dos', sc.pistas.every(p => !p.combinaCon), JSON.stringify(sc.pistas));
+    }
+
     /* ── 6h. base vacía: se siembra sola desde el ejemplo ─────────────── */
     console.log('\n6h. Con la base vacía, se siembra desde data/seed.example.csv');
     await truncarTodo();
@@ -984,6 +1015,67 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     await reiniciarServidor();
     rs = await snapshot('ring-1');
     chequear('el resultado sobrevive al reinicio', de(rs, '45').resultado?.tiempo === 38.52, JSON.stringify(de(rs, '45').resultado));
+
+    /* ── 7z. combinado: la planilla del Nacional 2026 ─────────────────── */
+    console.log('\n7z. Combinado (planilla del Combinado Final G2, Small/Medium)');
+    {
+      // Los mismos tiempos y faltas que la planilla real, con nombres
+      // inventados. P1 es el Jumping (TRS 49,8078), P2 el Agility (56,345).
+      const fila = (n, altura, p1, p2) => ({ dorsal: String(100 + n), perro: `PERRO ${n}`, guia: `Guía ${n}`, altura, p1, p2 });
+      const DESC = 'desc';
+      const filas = [
+        fila(1, 'Medium', [42.5, 1], [47.75, 0]), fila(2, 'Small', [41.06, 1], [43.63, 1]),
+        fila(3, 'Medium', [61, 0], [62, 0]), fila(4, 'Medium', [48.72, 1], [66, 1]),
+        fila(5, 'Small', [46, 3], [46.38, 1]), fila(6, 'Small', [51.25, 3], [44.62, 1]),
+        fila(7, 'Medium', [57.94, 3], [47.66, 1]), fila(8, 'Medium', [42.21, 0], DESC),
+        fila(9, 'Small', [44.72, 0], DESC), fila(10, 'Medium', DESC, DESC), fila(11, 'Small', DESC, DESC)
+      ];
+      const lista = (cual, pistaId) => filas.map((f, n) => ({
+        id: `${pistaId}-${n}`, pistaId, dorsal: f.dorsal, perro: f.perro, guia: f.guia, altura: f.altura,
+        categoria: 'G2', estado: 'corrido',
+        resultado: f[cual] === DESC ? { tiempo: null, faltas: 0, rehuses: 0, eliminado: true }
+          : { tiempo: f[cual][0], faltas: f[cual][1], rehuses: 0, eliminado: false }
+      }));
+      const comb = Resultados.clasificarCombinado(
+        { lista: lista('p1', 'j'), trs: { trs: 49.8078 } },
+        { lista: lista('p2', 'a'), trs: { trs: 56.345 } },
+        { ranking: true });
+      chequear('un solo podio: Mini/Midi G2/G3', comb.length === 1 && comb[0].nombre === 'Mini/Midi G2/G3',
+        comb.map(p => p.nombre).join());
+      const r = comb[0].filas.map(f => [f.perro.replace('PERRO ', ''), f.puesto ?? '-', Resultados.fmt(f.faltas),
+        Resultados.fmt(f.tiempo), f.calif, f.puntos].join(' '));
+      const esperado = [
+        '1 1 5,00 90,25 Exc 9', '2 2 10,00 84,69 MB 7', '3 3 16,85 123,00 B 5', '4 4 19,66 114,72 B 4',
+        '5 5 20,00 92,38 B 3', '6 6 21,44 95,87 B 2', '7 7 28,13 105,60 No clasifica 0',
+        '8 - 100,00 42,21 No clasifica 0', '9 - 100,00 44,72 No clasifica 0',
+        '10 - 200,00 0,00 No clasifica 0', '11 - 200,00 0,00 No clasifica 0'
+      ];
+      chequear('igual que la planilla: puesto, faltas, tiempo, calificación y puntos (Anexo I.B)',
+        r.join(' | ') === esperado.join(' | '), r.join(' | '));
+      chequear('cada parte guarda su detalle (P1 del 3: 11,19 de tiempo)',
+        Resultados.fmt(comb[0].filas[2].partes[0].faltas) === '11,19', JSON.stringify(comb[0].filas[2].partes));
+
+      // Intermediate/Large de la misma planilla: el 1º en cero, 10 puntos.
+      const dos = (lst, res) => lst.slice(0, 2).map((i, n) => ({ ...i, altura: 'Large', resultado: res[n] }));
+      const il = Resultados.clasificarCombinado(
+        { lista: dos(lista('p1', 'j'), [{ tiempo: 39.4, faltas: 0, rehuses: 0 }, { tiempo: 37.13, faltas: 1, rehuses: 0 }]), trs: { trs: 50 } },
+        { lista: dos(lista('p2', 'a'), [{ tiempo: 41.22, faltas: 0, rehuses: 0 }, { tiempo: 38.94, faltas: 1, rehuses: 0 }]), trs: { trs: 50 } },
+        { ranking: true })[0];
+      chequear('I/L: 1º Cero Exc → 10, 2º MB → 7',
+        il.filas.map(f => `${f.puesto}:${f.calif}:${f.puntos}`).join(' ') === '1:Cero Exc:10 2:MB:7',
+        il.filas.map(f => `${f.puesto}:${f.calif}:${f.puntos}`).join(' '));
+
+      const sinRanking = Resultados.clasificarCombinado(
+        { lista: lista('p1', 'j'), trs: { trs: 49.8078 } }, { lista: lista('p2', 'a'), trs: { trs: 56.345 } });
+      chequear('fecha independiente: el combinado tiene puestos, pero no puntos',
+        sinRanking[0].filas.every(f => f.puntos === undefined) && sinRanking[0].filas[0].puesto === 1);
+
+      const aMedias = Resultados.clasificarCombinado(
+        { lista: lista('p1', 'j'), trs: { trs: 49.8078 } },
+        { lista: lista('p2', 'a').map((i, n) => (n === 0 ? { ...i, estado: 'pendiente', resultado: null } : i)), trs: { trs: 56.345 } });
+      chequear('el que todavía no corrió la segunda no entra, pero se cuenta',
+        aMedias[0].faltan === 1 && !aMedias[0].filas.some(f => f.perro === 'PERRO 1'), JSON.stringify(aMedias[0].faltan));
+    }
 
     /* ── 8. bloqueo de PIN ─────────────────────────────────────────────── */
     console.log('\n8. Fuerza bruta del PIN');

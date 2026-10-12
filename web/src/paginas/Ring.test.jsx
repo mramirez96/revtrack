@@ -124,6 +124,34 @@ describe('vista del corredor', () => {
     expect((await screen.findByTestId('turno')).textContent).not.toMatch(/puntos/);
   });
 
+  it('si la pista es parte de un combinado, aparece la pestaña Combinado y "Tu turno" lo dice', async () => {
+    const r = (tiempo, faltas) => ({ tiempo, faltas, rehuses: 0, eliminado: false });
+    const pistas = [{ ...PISTA, nombre: 'Jumping Final', trs: { trs: 50 }, combinaCon: 'm2' },
+      { id: 'm2', nombre: 'Agility Final', estado: 'pendiente', trs: { trs: 60 }, combinaCon: 'm1' }];
+    const ins = [
+      perro(1, '47', 'Luna', 'Ana Paz', 'Intermediate', 'G2', 'corrido', r(40, 1), 'm1'),
+      perro(2, '41', 'Kira', 'Sofía', 'Large', 'G2', 'corrido', r(41, 0), 'm1'),
+      perro(3, '47', 'Luna', 'Ana Paz', 'Intermediate', 'G2', 'corrido', r(50, 0), 'm2'),
+      perro(4, '41', 'Kira', 'Sofía', 'Large', 'G2', 'corrido', r(52, 2), 'm2')
+    ];
+    montar(armarSnapshot(ins, { pistas, evento: { ranking: true } }));
+    // Luna: 5 + 0 = 5 → Exc, 1º (Kira suma 10) → 9 puntos del Anexo I.B.
+    expect((await screen.findByTestId('turno')).textContent).toMatch(/Combinado: 1º de 2 · F: 5,00 · Exc · 9 puntos/);
+    fireEvent.click(screen.getByText('Combinado'));
+    const c = screen.getByTestId('combinado');
+    expect(c.textContent).toContain('Combinado · Jumping Final + Agility Final');
+    const luna = within(c).getByText('Luna').closest('li');
+    expect(luna.querySelector('.puesto').textContent).toBe('1');
+    expect(luna.textContent).toContain('Jumping Final: 5,00 · 40,00 s · Agility Final: 0,00 · 50,00 s');
+    expect(luna.querySelector('.cola-res').textContent).toBe('F: 5,0090,00 s');
+  });
+
+  it('sin combinado no hay pestaña Combinado', async () => {
+    montar(armarSnapshot(lista({ tiempo: 38.2, faltas: 0, rehuses: 0, eliminado: false }), { pistas: [PISTA] }));
+    await screen.findByTestId('orden');
+    expect(screen.queryByText('Combinado')).toBeNull();
+  });
+
   it('con largo cargado muestra la velocidad; el descalificado dice DESC', async () => {
     const conDesc = lista({ tiempo: 38.2, faltas: 0, rehuses: 0, eliminado: false }).map(i =>
       i.dorsal === '42' ? { ...i, estado: 'corrido', resultado: { tiempo: 50, faltas: 0, rehuses: 0, eliminado: true } } : i);

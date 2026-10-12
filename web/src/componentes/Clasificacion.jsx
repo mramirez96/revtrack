@@ -69,3 +69,43 @@ export default function Clasificacion({ snap, clave = '' }) {
     </div>
   );
 }
+
+// Una parte del combinado, como en la planilla: "5,00 · 42,50 s", o "DESC".
+const parteTexto = q => (q.desc ? 'DESC' : `${R.fmt(q.faltas)} · ${R.fmt(q.tiempo)} s`);
+
+// El combinado de dos pistas, por podio: faltas y tiempo sumados, y el
+// detalle de cada pista abajo. Los descalificados en alguna, al final.
+export function ClasificacionCombinado({ combinado, clave = '' }) {
+  const podios = (combinado?.clasificacion || []).filter(p => p.filas.length);
+  const [p1, p2] = combinado?.pistas || [];
+  return (
+    <div className="clasif" data-testid="combinado">
+      <p className="clasif-trs mono">Combinado · {p1?.nombre} + {p2?.nombre}</p>
+      {!podios.length && <p className="vacio">Todavía nadie terminó las dos pistas.</p>}
+      {podios.map(p => (
+        <div key={p.id} className="podio">
+          <p className="podio-tit">{p.nombre}</p>
+          <ol className="cola-lista">
+            {p.filas.map(f => (
+              <li key={f.id} className={`cola-item ${esMio(f, clave) ? 'vos' : ''} ${f.desc ? 'eliminado' : ''}`}>
+                <span className={`dorsal puesto ${f.puesto ? '' : 'desc'}`}>{f.puesto ?? 'DESC'}</span>
+                <span className="cola-quien">
+                  <span className="cola-nombre">{f.perro}</span><br />
+                  <span className="cola-sub">{f.dorsal ? `${f.dorsal} · ` : ''}{f.guia}<Etiquetas i={f} />{' '}
+                    <span className={`etiq calif ${f.calif === 'Cero Exc' ? 'cero' : ''}`}>{f.calif}</span>
+                    {f.puntos !== undefined && <> <span className="etiq pts">{pts(f.puntos)}</span></>}</span>
+                  <br /><span className="cola-sub mono">{p1?.nombre}: {parteTexto(f.partes[0])} · {p2?.nombre}: {parteTexto(f.partes[1])}</span>
+                </span>
+                <span className="cola-eta cola-res mono">
+                  <span>{f.desc ? 'DESC' : `F: ${R.fmt(f.faltas)}`}</span>
+                  <span>{R.fmt(f.tiempo)} s</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          {p.faltan > 0 && <p className="podio-nota">Provisorio · {p.faltan} sin las dos pistas</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
