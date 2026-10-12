@@ -127,7 +127,9 @@ real rows from them:
 - **Podiums merge heights**, as this club awards them: XS, Mini (Small) and Midi
   (Medium) share one; Intermediate and Large share another. Each is split by grade,
   Iniciantes (the old G0, accepted under either name) first, so the podiums read
-  *Mini/Midi Iniciantes*, *Mini/Midi G1*, *Intermediate/Large G2*…
+  *Mini/Midi Iniciantes*, *Mini/Midi G1*, *Intermediate/Large G2/G3*… G2 and G3
+  share one podium, as the regulation requires until there are at least 10 G3 dogs of
+  one height (Art. 34); the table can give G3 its own for the whole event.
 - Entering results never blocks *Siguiente*: dogs that ran without one show up as
   "faltan cargar" and every result stays editable (and undoable).
 

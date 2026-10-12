@@ -17,7 +17,9 @@ function borradorDe(i) {
   };
 }
 
-const nombrePodio = i => i.podio || R.podioDe(i).nombre;
+// El podio viene calculado del servidor una vez que el perro tiene resultado;
+// antes, se arma acá con las mismas reglas (y el mismo ajuste de G2/G3).
+const nombrePodio = (i, evento) => i.podio || R.podioDe(i, { separarG3: !!evento?.separarG3 }).nombre;
 
 // La penalización de lo que está tipeado, antes de guardar: el mismo cálculo
 // que el servidor (shared/resultados.mjs), así lo que se ve es lo que va a quedar.
@@ -151,7 +153,7 @@ export function EnPistaMesa({ snap, res, accion }) {
       <div className="mesa-actual-fila">
         <Dorsal i={actual} />
         <span><span className="mesa-actual-nombre">{actual.perro}</span><br />
-          <span className="mesa-actual-sub">{actual.guia}<Etiquetas i={actual} /> · {nombrePodio(actual)}</span></span>
+          <span className="mesa-actual-sub">{actual.guia}<Etiquetas i={actual} /> · {nombrePodio(actual, snap.evento)}</span></span>
       </div>
       <FormResultado key={actual.id} perro={actual} res={res} regla={R.reglaDe(snap.trs, actual.altura)} grande enfocar
                      textoBoton={otra ? 'Guardar resultado' : 'Guardar y largar el siguiente'}
@@ -217,7 +219,7 @@ export function CorregirResultados({ snap, res }) {
           <div className="mesa-actual-fila">
             <Dorsal i={ed} />
             <span><span className="mesa-item-quien">{ed.perro}</span><br />
-              <span className="mesa-item-sub">{ed.guia}<Etiquetas i={ed} /> · {nombrePodio(ed)}</span></span>
+              <span className="mesa-item-sub">{ed.guia}<Etiquetas i={ed} /> · {nombrePodio(ed, snap.evento)}</span></span>
           </div>
           <FormResultado key={ed.id} perro={ed} res={res} regla={R.reglaDe(snap.trs, ed.altura)} textoBoton="Guardar resultado"
                          onGuardar={guardar}

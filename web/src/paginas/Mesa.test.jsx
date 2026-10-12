@@ -258,6 +258,16 @@ describe('mesa', () => {
     expect(pedidos[0].body).toEqual({ nombre: 'Nacional Ejemplo', fecha: '2026-10-10' });
   });
 
+  it('G3 con podio propio se prende desde la mesa', async () => {
+    montar();
+    const tilde = await screen.findByLabelText(/G3 con podio propio/);
+    expect(tilde.checked).toBe(false);
+    fireEvent.click(tilde);
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0].url).toBe('/api/ring/ring-1/separar_g3');
+    expect(pedidos[0].body).toEqual({ separar: true });
+  });
+
   it('con un token de otro ring pide el PIN', async () => {
     montar(tokenDe('otro-ring'));
     expect(await screen.findByText('Control de mesa')).toBeTruthy();

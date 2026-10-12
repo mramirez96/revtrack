@@ -20,7 +20,9 @@ app.use(express.json({ limit: '1mb' }));
 // ring, corre `fn`, y si no fue un error guarda todo y difunde por Realtime.
 // `fn` recibe (state, undoPila, req) y devuelve lo mismo que las funciones de
 // lib/estado.js: null | string de error | { aviso }.
-function accionRing(fn) {
+// `todos`: la acción cambia algo del evento que se ve en todas las canchas,
+// así que se difunden todas y no sólo la de la mesa.
+function accionRing(fn, { todos = false } = {}) {
   return async (req, res) => {
     const ringId = req.params.ringId;
     try {
@@ -34,7 +36,7 @@ function accionRing(fn) {
         return { resultado, state };
       });
       if (r.error) return res.status(400).json({ error: r.error });
-      await realtime.difundirRing(r.state, ringId);
+      await (todos ? realtime.difundirTodos(r.state) : realtime.difundirRing(r.state, ringId));
       res.json(r.resultado && r.resultado.aviso ? { aviso: r.resultado.aviso } : {});
     } catch (e) {
       console.error(e);
@@ -125,6 +127,10 @@ app.post('/api/ring/:ringId/trs', auth.requiereMesa, accionRing(
 // difunde con el snapshot de siempre (que trae `evento`) y llega al lobby.
 app.post('/api/ring/:ringId/evento', auth.requiereMesa, accionRing(
   (state, _undo, req) => estado.renombrarEvento(state, req.body)));
+
+// G2/G3 juntos o separados: es del evento, y cambia los podios de todas las canchas.
+app.post('/api/ring/:ringId/separar_g3', auth.requiereMesa, accionRing(
+  (state, _undo, req) => estado.separarG3(state, req.body), { todos: true }));
 
 app.post('/api/ring/:ringId/deshacer', auth.requiereMesa, accionRing(
   (state, undo) => estado.deshacer(state, undo)));
