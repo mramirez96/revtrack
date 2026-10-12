@@ -95,8 +95,15 @@ function FormResultado({ perro, res, regla, separarG3, grande, textoBoton, onGua
   const tiempo = useRef(null);
   const cambiar = c => setB(x => ({ ...x, ...c }));
 
+  // Al largar el siguiente, el cursor va a su tiempo, pero sin que el navegador
+  // baje la página hasta el campo: en el celular eso dejaba al perro nuevo
+  // fuera de pantalla. Se acomoda la tarjeta con el perro arriba de todo; el
+  // tiempo y el botón quedan debajo, a la vista aunque se abra el teclado.
   useEffect(() => {
-    if (enfocar && res.enfocar && tiempo.current) { tiempo.current.focus(); res.enfocado(); }
+    if (!(enfocar && res.enfocar && tiempo.current)) return;
+    tiempo.current.focus({ preventScroll: true });
+    tiempo.current.closest('.mesa-actual')?.scrollIntoView?.({ block: 'start' });
+    res.enfocado();
   }, [enfocar, res]);
 
   function guardar() {

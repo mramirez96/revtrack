@@ -141,6 +141,26 @@ describe('mesa', () => {
     await act(async () => { soltar(); });
   });
 
+  it('al largar el siguiente, la página no baja hasta el tiempo: muestra la tarjeta desde arriba', async () => {
+    const focos = vi.spyOn(HTMLElement.prototype, 'focus');
+    const acomodar = vi.fn();
+    HTMLElement.prototype.scrollIntoView = acomodar;
+    try {
+      montar();
+      await screen.findByTestId('en-pista');
+      fireEvent.change(within(tarjeta()).getByLabelText('Tiempo'), { target: { value: '37' } });
+      fireEvent.click(within(tarjeta()).getByText('Guardar y largar el siguiente'));
+      await waitFor(() => expect(within(tarjeta()).getByText('NIEBLA')).toBeTruthy());
+
+      expect(focos).toHaveBeenLastCalledWith({ preventScroll: true });
+      expect(acomodar.mock.instances.at(-1)).toBe(tarjeta());
+      expect(acomodar).toHaveBeenLastCalledWith({ block: 'start' });
+    } finally {
+      focos.mockRestore();
+      delete HTMLElement.prototype.scrollIntoView;
+    }
+  });
+
   it('si el servidor rechaza el guardado, vuelve al perro con lo tipeado', async () => {
     respuestaAccion = () => ({ status: 500, json: { error: 'Algo falló.' } });
     montar();

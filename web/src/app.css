@@ -290,6 +290,9 @@ body.mesa { background: var(--turf); color: var(--chalk); }
 
 .mesa-actual {
   padding: 16px 0 20px; border-bottom: 1px solid rgba(244,246,241,.18);
+  /* Al acomodarla arriba (después de largar el siguiente), que no quede
+     debajo de la cabecera fija. */
+  scroll-margin-top: 52px;
 }
 .mesa-actual .eyebrow { color: #8FB3A0; }
 .mesa-actual-fila { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
