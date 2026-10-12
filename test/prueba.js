@@ -883,14 +883,17 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
         ({ id, altura: 'Large', categoria, estado: 'corrido', resultado: { tiempo, faltas, rehuses: 0, ...extra } });
       const pG2 = Resultados.clasificar([
         l('a', 'G2', 30), l('b', 'G2', 31, 1), l('c', 'G2', 31, 1), l('d', 'G3', 32, 6), l('e', 'G2', 20, 0, { eliminado: true })
-      ], { trs: 45 })[0];
+      ], { trs: 45 }, { ranking: true })[0];
       const pts = pG2.filas.map(f => `${f.id}:${f.puesto ?? '-'}:${f.puntos}`).join(' ');
       chequear('G2/G3: 1º Cero 25; empatados 2º Exc 18 cada uno; 4º No clasifica 0; eliminado 0',
         pts === 'a:1:25 b:2:18 c:2:18 d:4:0 e:-:0', pts);
-      const pG1 = Resultados.clasificar([l('a', 'G1', 30)], { trs: 45 })[0];
+      const pG1 = Resultados.clasificar([l('a', 'G1', 30)], { trs: 45 }, { ranking: true })[0];
       chequear('G1 no suma ranking: sin puntos', pG1.filas[0].puntos === undefined, JSON.stringify(pG1.filas[0]));
-      const pIni = Resultados.clasificar([l('a', 'Iniciantes', 30)], { trs: 45 })[0];
+      const pIni = Resultados.clasificar([l('a', 'Iniciantes', 30)], { trs: 45 }, { ranking: true })[0];
       chequear('Iniciantes tampoco', pIni.filas[0].puntos === undefined);
+      const pInd = Resultados.clasificar([l('a', 'G2', 30), l('e', 'G2', 20, 0, { eliminado: true })], { trs: 45 })[0];
+      chequear('una fecha independiente no da puntos, ni siquiera en G2/G3',
+        pInd.filas.every(f => f.puntos === undefined), JSON.stringify(pInd.filas));
     }
     chequear('cortes de calificación de la planilla',
       ['Exc', 'MB', 'MB', 'B', 'B', 'No clasifica'].join() ===
@@ -939,6 +942,17 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     chequear('el ajuste es del evento: la otra cancha también lo ve',
       (await snapshot('ring-2')).evento.separarG3 === true);
     rs = (await accion('ring-1', 'separar_g3', mesaRes.token, { separar: false })).snap;
+
+    // Fecha de ranking: de entrada no, y sin eso no hay puntos.
+    chequear('de entrada la fecha es independiente: sin puntos',
+      rs.evento.ranking === false && de(rs, '45').puntos === undefined, JSON.stringify(rs.evento));
+    const sinDatoR = await accion('ring-1', 'ranking', mesaRes.token, {});
+    chequear('fecha de ranking sin decir sí o no se rechaza', !!sinDatoR.error, JSON.stringify(sinDatoR));
+    rs = (await accion('ring-1', 'ranking', mesaRes.token, { ranking: true })).snap;
+    chequear('fecha de ranking: el G2 suma puntos (1º con Exc → 21)', de(rs, '45').puntos === 21, JSON.stringify(de(rs, '45')));
+    chequear('y la otra cancha también ve la fecha como de ranking', (await snapshot('ring-2')).evento.ranking === true);
+    rs = (await accion('ring-1', 'ranking', mesaRes.token, { ranking: false })).snap;
+    chequear('volver a independiente saca los puntos', de(rs, '45').puntos === undefined);
     chequear('volver a juntarlos los deja como estaban',
       rs.clasificacion.map(p => p.nombre).join(' / ') === nombres, rs.clasificacion.map(p => p.nombre).join(' / '));
 

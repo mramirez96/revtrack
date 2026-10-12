@@ -128,7 +128,8 @@ real rows from them:
 - Ranked by total penalty, then time. Exact ties share a placing.
 - Grading, same cut-offs as the club's spreadsheet: 0 *Cero Exc*, ≤5.99 *Exc*,
   ≤15.99 *MB*, ≤25.99 *B*, otherwise *No clasifica*.
-- **Ranking points** per round in G2/G3 only (Anexo I.A, Art. 55), by placing and
+- **Ranking points**, only on a ranking date (the table ticks *Fecha de ranking*;
+  independent dates, Art. 57, only have podiums) and only in G2/G3 (Anexo I.A, Art. 55), by placing and
   grading: 1st gets 25 with *Cero Exc*, 21 *Exc*, 18 *MB*, 16 *B*, down to 1 at 20th
   (and past it). *No clasifica* and eliminated get 0; tied dogs share the points.
 - **Podiums merge heights**, as this club awards them: XS, Mini (Small) and Midi

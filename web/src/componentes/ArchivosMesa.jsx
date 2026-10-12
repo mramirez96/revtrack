@@ -86,6 +86,12 @@ export function DatosEvento({ snap, accion }) {
                onChange={e => accion('separar_g3', { separar: e.target.checked })} /> G3 con podio propio
         (si no, G2 y G3 van juntos en G2/G3)
       </label>
+      {/* Art. 52 a 57: sólo en una fecha de ranking las pistas de G2/G3 dan puntos. */}
+      <label className="orden-check" style={{ display: 'block', marginTop: 8 }}>
+        <input type="checkbox" checked={!!snap.evento.ranking}
+               onChange={e => accion('ranking', { ranking: e.target.checked })} /> Fecha de ranking
+        (G2/G3 suman puntos; si no, es una fecha independiente: sólo podio)
+      </label>
     </section>
   );
 }

@@ -132,6 +132,10 @@ app.post('/api/ring/:ringId/evento', auth.requiereMesa, accionRing(
 app.post('/api/ring/:ringId/separar_g3', auth.requiereMesa, accionRing(
   (state, _undo, req) => estado.separarG3(state, req.body), { todos: true }));
 
+// Fecha de ranking o independiente: también del evento, en todas las canchas.
+app.post('/api/ring/:ringId/ranking', auth.requiereMesa, accionRing(
+  (state, _undo, req) => estado.fechaRanking(state, req.body), { todos: true }));
+
 app.post('/api/ring/:ringId/deshacer', auth.requiereMesa, accionRing(
   (state, undo) => estado.deshacer(state, undo)));
 

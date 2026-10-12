@@ -290,6 +290,16 @@ describe('mesa', () => {
     expect(pedidos[0].body).toEqual({ separar: true });
   });
 
+  it('la fecha de ranking se prende desde la mesa', async () => {
+    montar();
+    const tilde = await screen.findByLabelText(/Fecha de ranking/);
+    expect(tilde.checked).toBe(false);
+    fireEvent.click(tilde);
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0].url).toBe('/api/ring/ring-1/ranking');
+    expect(pedidos[0].body).toEqual({ ranking: true });
+  });
+
   it('con un token de otro ring pide el PIN', async () => {
     montar(tokenDe('otro-ring'));
     expect(await screen.findByText('Control de mesa')).toBeTruthy();
