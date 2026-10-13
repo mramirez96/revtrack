@@ -80,9 +80,9 @@ mixed together, in sequence.
 Four flat collections in `state`, related by id:
 
 ```
-evento          { nombre, fecha }
+evento          { nombre, fecha, organizador }
 rings[]         { id, nombre }                    the physical course
-pistas[]        { id, ringId, nombre, orden, estado, segPerro, trs }
+pistas[]        { id, ringId, nombre, orden, estado, segPerro, trs, juez }
 inscripciones[] { id, pistaId, orden, dorsal, guia, perro, altura, categoria, estado, resultado }
 marcas{}        pistaId -> [timestamps]           used to measure real pace
 ```
@@ -146,6 +146,15 @@ real rows from them:
   one height (Art. 34); the table can give G3 its own for the whole event.
 - Entering results never blocks *Siguiente*: dogs that ran without one show up as
   "faltan cargar" and every result stays editable (and undoable).
+
+**Result sheets.** From the table, each round (and each combinado) downloads as a
+PDF in the layout of the federation's sheets: one page per podium, with judge, date,
+organiser, course length, speed and TRS on top, and per dog the *señas*, faults ×5,
+time, m/s, time faults, total, grading and points. It is drawn in the browser
+(jsPDF, loaded only when the button is pressed), from the same snapshot the screens
+use. Only counts are stored, not the order of the judge's signals, so *señas* come
+grouped (`FFN`, `CERO`, `DESC`). A sheet printed with dogs still to run says it is
+provisional.
 
 Competitors see each dog's penalty and time in the running order, their own placing
 under *Tu turno*, and a *Clasificación* tab (marked provisional while dogs are still

@@ -268,11 +268,12 @@ describe('mesa', () => {
     expect(screen.getByLabelText('TRS Mini/Midi').value).toBe('45');
     expect(screen.queryByText(/Ajustado a mano/)).toBeNull();
 
-    fireEvent.click(screen.getByText('Guardar TRS'));
+    fireEvent.change(screen.getByLabelText('Juez'), { target: { value: 'Juez Ejemplo' } });
+    fireEvent.click(screen.getByText('Guardar juez y TRS'));
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0].url).toBe('/api/ring/ring-1/trs');
     expect(pedidos[0].body).toEqual({
-      pistaId: 'p1', largo: '191',
+      pistaId: 'p1', juez: 'Juez Ejemplo', largo: '191',
       grupos: { 'small-midi': { velocidad: '4,5', trs: '45' }, 'intermediate-large': { velocidad: '', trs: '40,00' } }
     });
   });
@@ -286,18 +287,19 @@ describe('mesa', () => {
     expect(within(filas[1]).getByLabelText('Tiempo')).toBeTruthy();
   });
 
-  it('el nombre y la fecha del evento se corrigen desde la mesa', async () => {
+  it('el nombre, la fecha y el organizador del evento se corrigen desde la mesa', async () => {
     montar();
     const nombre = await screen.findByLabelText('Nombre del evento');
     expect(nombre.value).toBe('Winter Open');
-    const guardar = screen.getByText('Guardar nombre y fecha');
+    const guardar = screen.getByText('Guardar datos');
     expect(guardar.disabled).toBe(true);
     fireEvent.change(nombre, { target: { value: 'Nacional Ejemplo' } });
     fireEvent.change(screen.getByLabelText('Fecha del evento'), { target: { value: '2026-10-10' } });
+    fireEvent.change(screen.getByLabelText('Organizador'), { target: { value: 'Club Ejemplo' } });
     fireEvent.click(guardar);
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0].url).toBe('/api/ring/ring-1/evento');
-    expect(pedidos[0].body).toEqual({ nombre: 'Nacional Ejemplo', fecha: '2026-10-10' });
+    expect(pedidos[0].body).toEqual({ nombre: 'Nacional Ejemplo', fecha: '2026-10-10', organizador: 'Club Ejemplo' });
   });
 
   it('G3 con podio propio se prende desde la mesa', async () => {

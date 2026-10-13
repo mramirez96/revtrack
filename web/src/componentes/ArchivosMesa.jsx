@@ -59,12 +59,15 @@ export function CargarOrden({ snap, accion, mostrar }) {
   );
 }
 
-// Nombre y fecha del evento, editables sin recargar nada: lo que se cargó con
-// la competencia puede haber quedado mal, y lo corrido no se toca.
+// Nombre, fecha y organizador del evento, editables sin recargar nada: lo que
+// se cargó con la competencia puede haber quedado mal, y lo corrido no se
+// toca. El organizador es el "ORG:" de las planillas.
 export function DatosEvento({ snap, accion }) {
   const [nombre, setNombre] = useState(snap.evento.nombre);
   const [fecha, setFecha] = useState(snap.evento.fecha);
-  const cambio = nombre.trim() !== snap.evento.nombre || fecha !== snap.evento.fecha;
+  const [organizador, setOrganizador] = useState(snap.evento.organizador || '');
+  const cambio = nombre.trim() !== snap.evento.nombre || fecha !== snap.evento.fecha ||
+    organizador.trim() !== (snap.evento.organizador || '');
 
   return (
     <section className="mesa-seccion">
@@ -74,9 +77,11 @@ export function DatosEvento({ snap, accion }) {
                style={{ minWidth: 260, fontFamily: 'inherit' }} value={nombre} onChange={e => setNombre(e.target.value)} />
         <input type="date" aria-label="Fecha del evento" style={{ fontFamily: 'inherit' }}
                value={fecha} onChange={e => setFecha(e.target.value)} />
+        <input type="text" aria-label="Organizador" placeholder="Organizador (sale en las planillas)" maxLength={120}
+               style={{ minWidth: 260, fontFamily: 'inherit' }} value={organizador} onChange={e => setOrganizador(e.target.value)} />
         <BotonCarga className="mesa-btn secundario" style={{ fontSize: 16, padding: '12px 18px' }}
-                    disabled={!cambio || !nombre.trim()} onClick={() => accion('evento', { nombre, fecha })}>
-          Guardar nombre y fecha
+                    disabled={!cambio || !nombre.trim()} onClick={() => accion('evento', { nombre, fecha, organizador })}>
+          Guardar datos
         </BotonCarga>
       </div>
       {/* Art. 34 del Reglamento Nacional: G2 y G3 corren unificados mientras no

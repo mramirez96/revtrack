@@ -616,6 +616,13 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     chequear('el evento queda con el nombre y la fecha nuevos, y las pistas siguen',
       resR.evento.nombre === 'Nacional Ejemplo' && resR.evento.fecha === '2026-10-05' && resR.rings[0].pistas.length === 2,
       JSON.stringify(resR.evento));
+    const conOrg = await accion(ringE, 'evento', mesaE.token, { nombre: 'Nacional Ejemplo', fecha: '2026-10-05', organizador: ' Club Ejemplo ' });
+    chequear('el organizador de las planillas se guarda en la base',
+      conOrg.snap.evento.organizador === 'Club Ejemplo' && (await snapshot(ringE)).evento.organizador === 'Club Ejemplo',
+      JSON.stringify(conOrg.snap.evento));
+    const sinOrg = await accion(ringE, 'evento', mesaE.token, { nombre: 'Nacional Ejemplo', fecha: '2026-10-05' });
+    chequear('renombrar sin mandar organizador no lo borra', sinOrg.snap.evento.organizador === 'Club Ejemplo',
+      JSON.stringify(sinOrg.snap.evento));
     chequear('cargó las 2 pistas nuevas',
       resN.rings[0].pistas.map(p => p.nombre).join(',') === 'Agility 1,Final',
       resN.rings[0].pistas.map(p => p.nombre).join(','));
@@ -804,7 +811,11 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     chequear('en un open, G1 y G2 usan el mismo TRS (cada uno en su podio)',
       open.length === 2 && open.every(p => p.filas[0].res.exceso === 2), JSON.stringify(open.map(p => [p.nombre, p.filas[0].res.exceso])));
 
+    rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, juez: ' Juez Ejemplo ', trs: '39' })).snap;
+    chequear('el juez de la pista se guarda con el TRS', rs.pista.juez === 'Juez Ejemplo' &&
+      (await snapshot('ring-1')).pista.juez === 'Juez Ejemplo', JSON.stringify(rs.pista));
     rs = (await accion('ring-1', 'trs', mesaRes.token, { pistaId: PISTA, largo: '191', velocidad: '4,5' })).snap;
+    chequear('cambiar el TRS sin mandar juez no lo borra', rs.pista.juez === 'Juez Ejemplo', JSON.stringify(rs.pista));
     chequear('con largo y velocidad, el TRS sale de dividir (191 m ÷ 4,5 m/s = 42,44 s)',
       Math.abs(rs.trs.trs - 42.444444) < 1e-5 && rs.trs.largo === 191 && rs.trs.velocidad === 4.5,
       JSON.stringify(rs.trs));

@@ -10,6 +10,7 @@ import { CorregirResultados, EnPistaMesa, useResultados } from '../componentes/R
 import TrsPista from '../componentes/TrsPista.jsx';
 import { CargarOrden, DatosEvento, NuevaCompetencia } from '../componentes/ArchivosMesa.jsx';
 import Clasificacion, { ClasificacionCombinado } from '../componentes/Clasificacion.jsx';
+import { descargarPdf, hojasCombinado, hojasPista, nombreArchivo } from '../lib/planilla.js';
 
 /* ── token de mesa ───────────────────────────────────────────────────── */
 
@@ -204,9 +205,9 @@ function Panel({ snap, ringId, token, accion, mostrar, setViendo }) {
 
     <CorregirResultados key={`resultados:${snap.pista?.id}`} snap={snap} res={res} />
 
-    <ClasificacionMesa snap={snap} />
+    <ClasificacionMesa snap={snap} mostrar={mostrar} />
 
-    <CombinadoMesa snap={snap} accion={accion} />
+    <CombinadoMesa snap={snap} accion={accion} mostrar={mostrar} />
 
     <section className="mesa-seccion">
       <p className="eyebrow">{otra ? 'Orden de salida' : 'Próximos'}</p>
@@ -281,7 +282,7 @@ function Programa({ snap, accion, setViendo }) {
 // Combinado: esta pista se suma con otra de la cancha (típicamente un Jumping
 // con un Agility), o va sola. Es opcional: en una fecha puede no haber
 // ninguno, o uno solo (la final). Debajo, la clasificación sumada, plegada.
-function CombinadoMesa({ snap, accion }) {
+function CombinadoMesa({ snap, accion, mostrar }) {
   const [ver, setVer] = useState(false);
   if (!snap.pista) return null;
   const con = snap.pistas.find(p => p.id === snap.pista.id)?.combinaCon || '';
@@ -306,13 +307,17 @@ function CombinadoMesa({ snap, accion }) {
         </select>
       </div>
       {ver && snap.combinado && <div className="clasif-en-mesa"><ClasificacionCombinado combinado={snap.combinado} /></div>}
+      {snap.combinado && (
+        <BotonPlanilla mostrar={mostrar} hojas={() => hojasCombinado(snap)}
+                       archivo={`Planilla combinado ${snap.combinado.pistas.map(p => p.nombre).join(' + ')}`} />
+      )}
     </section>
   );
 }
 
 // La misma clasificación que ven los corredores, para chequearla desde la
 // mesa. Plegada por defecto: no es lo que se mira a cada rato.
-function ClasificacionMesa({ snap }) {
+function ClasificacionMesa({ snap, mostrar }) {
   const [ver, setVer] = useState(false);
   if (!snap.pista?.arrancada) return null;
   const n = (snap.clasificacion || []).reduce((a, p) => a + p.filas.length, 0);
@@ -325,6 +330,27 @@ function ClasificacionMesa({ snap }) {
         </button>
       </div>
       {ver && <div className="clasif-en-mesa"><Clasificacion snap={snap} /></div>}
+      <BotonPlanilla mostrar={mostrar} hojas={() => hojasPista(snap)} archivo={`Planilla ${snap.pista.nombre}`} />
     </section>
+  );
+}
+
+// Descarga la planilla de resultados en PDF, como las del Nacional: una hoja
+// por podio. Se puede bajar en cualquier momento; con perros por correr sale
+// marcada como provisoria.
+function BotonPlanilla({ hojas, archivo, mostrar }) {
+  async function bajar() {
+    const h = hojas();
+    if (!h.length) return mostrar('Todavía no hay resultados para la planilla.', true);
+    try {
+      await descargarPdf(h, nombreArchivo(archivo));
+    } catch {
+      mostrar('No pude armar el PDF. Probá de nuevo.', true);
+    }
+  }
+  return (
+    <div className="mesa-fila-chica">
+      <BotonCarga className="mesa-link" onClick={bajar}>Descargar planilla (PDF)</BotonCarga>
+    </div>
   );
 }

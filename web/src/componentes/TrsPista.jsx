@@ -19,8 +19,10 @@ function gruposDe(lista) {
 const podiosConRapido = (snap, grupoId) =>
   (snap.clasificacion || []).filter(p => p.grupo === grupoId && R.porcentajeTrs(p.grado));
 
-function desdeSnap(trsPista, grupos) {
+function desdeSnap(snap, grupos) {
+  const trsPista = snap.trs;
   return {
+    juez: snap.pista.juez || '',
     largo: trsPista?.largo ? fmtLibre(trsPista.largo) : '',
     grupos: Object.fromEntries(grupos.map(g => {
       const r = R.reglaDeGrupo(trsPista, g.id);
@@ -43,7 +45,7 @@ export default function TrsPista({ snap, accion, mostrar }) {
 
   const pid = snap.pista.id;
   const grupos = gruposDe(snap.lista);
-  const v = borradores[pid] || desdeSnap(snap.trs, grupos);
+  const v = borradores[pid] || desdeSnap(snap, grupos);
   const poner = n => setBorradores(b => ({ ...b, [pid]: n }));
 
   // Cuenta de un grupo con el largo y la velocidad dados; si no da, deja el TRS como está.
@@ -52,6 +54,7 @@ export default function TrsPista({ snap, accion, mostrar }) {
     return t ? { ...g, trs: R.fmt(t) } : g;
   };
   const cambiarLargo = largo => poner({
+    ...v,
     largo,
     grupos: Object.fromEntries(Object.entries(v.grupos).map(([id, g]) => [id, cuenta(largo, g)]))
   });
@@ -61,10 +64,10 @@ export default function TrsPista({ snap, accion, mostrar }) {
   };
 
   async function guardar() {
-    if (!(await accion('trs', { pistaId: pid, largo: v.largo, grupos: v.grupos }))) return;
+    if (!(await accion('trs', { pistaId: pid, juez: v.juez, largo: v.largo, grupos: v.grupos }))) return;
     setBorradores(b => { const n = { ...b }; delete n[pid]; return n; });
     const alguno = v.largo || Object.values(v.grupos).some(g => g.trs || g.velocidad);
-    mostrar(alguno ? 'TRS guardado. Los resultados se recalcularon.' : 'TRS borrado.');
+    mostrar(alguno ? 'TRS guardado. Los resultados se recalcularon.' : v.juez.trim() ? 'Juez guardado.' : 'TRS borrado.');
   }
 
   const campo = (nombre, aria, unidad, valor, onChange) => (
@@ -74,7 +77,7 @@ export default function TrsPista({ snap, accion, mostrar }) {
 
   return (
     <section className="mesa-seccion">
-      <p className="eyebrow">TRS · {snap.pista.nombre}</p>
+      <p className="eyebrow">Juez y TRS · {snap.pista.nombre}</p>
       <p className="mesa-actual-sub" style={{ margin: '8px 0 6px' }}>
         Uno por altura, para todos los grados. Con largo y velocidad se calcula, como en
         la planilla; si el juez da otro, tipealo encima. En G2/G3 vale el menor entre éste
@@ -82,6 +85,8 @@ export default function TrsPista({ snap, accion, mostrar }) {
         encima del TRS suma un punto.
       </p>
       <div className="trs-fila">
+        <label>Juez <input type="text" autoComplete="off" placeholder="—" aria-label="Juez" maxLength={120}
+                           style={{ width: 200 }} value={v.juez} onChange={e => poner({ ...v, juez: e.target.value })} /></label>
         {campo('Largo', 'Largo', 'm', v.largo, cambiarLargo)}
       </div>
       {grupos.map(g => (
@@ -101,7 +106,7 @@ export default function TrsPista({ snap, accion, mostrar }) {
       ))}
       <div className="trs-fila">
         <BotonCarga className="btn chico" style={{ background: 'var(--chalk)', color: 'var(--turf)' }} onClick={guardar}>
-          Guardar TRS
+          Guardar juez y TRS
         </BotonCarga>
       </div>
     </section>
