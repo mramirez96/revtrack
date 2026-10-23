@@ -1,5 +1,8 @@
 # RevTrack
 
+**Stack:** React 19 · Vite · Node.js · Express · PostgreSQL · Supabase Realtime ·
+Vercel (serverless) · Vitest + Testing Library · jsPDF
+
 Live starting-order board for dog agility competitions.
 
 A competitor opens the site on their phone and sees who is on course right now and
