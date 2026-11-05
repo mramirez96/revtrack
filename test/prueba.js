@@ -172,6 +172,16 @@ const FIXTURE = ['ring,pista,categoria,altura,dorsal,guia,perro,raza']
     await crearEsquema();
     await arrancarServidor();
 
+    /* ── 0. seguridad del esquema ────────────────────────────────────── */
+    console.log('\n0. Seguridad del esquema');
+    // Supabase publica las tablas por su API REST con una key pública: una
+    // tabla sin RLS queda abierta a cualquiera (ver 0007_rls.sql).
+    const sinRls = await db.pool.query(
+      `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = $1 and c.relkind in ('r', 'p') and not c.relrowsecurity`, [ESQUEMA]);
+    chequear('todas las tablas tienen RLS prendido', sinRls.rows.length === 0,
+      sinRls.rows.map(f => f.relname).join(', '));
+
     /* ── 1. arranque y forma del snapshot ────────────────────────────── */
     console.log('\n1. Arranque y forma de los datos');
     await sembrarFixture(FIXTURE);
